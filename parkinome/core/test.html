@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<h2>Parkinome Test</h2>
+
+<textarea id="json" rows="10" cols="50">
+{
+  "age": 65,
+  "updrs_iii": 24,
+  "moca": 26,
+  "scopa_aut": 15,
+  "hoehn_yahr": 2,
+  "ndufa4l2": -0.3,
+  "ndufs2": -0.2,
+  "pink1": -0.4,
+  "ppargc1a": -0.1,
+  "nlrp3": 0.8,
+  "il1b": 0.7,
+  "s100a8": 0.6,
+  "cxcl8": 0.5
+}
+</textarea>
+
+<br><br>
+<button onclick="send()">Send</button>
+
+<pre id="result"></pre>
+
+<script>
+function send() {
+    fetch("http://localhost:8080", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: document.getElementById("json").value
+    })
+    .then(res => res.text())
+    .then(data => {
+        document.getElementById("result").innerText = data;
+    });
+}
+</script>
+
+</body>
+</html>
