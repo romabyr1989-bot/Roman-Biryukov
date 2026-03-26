@@ -4,19 +4,15 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 
-#include "predict.h"
-#include <cjson/cJSON.h>
+#include "predictor.h"
+#include "json_io.h"
+#include "logger.h"
+#include "storage_sqlite.h"
 
 #define PORT 8080
 #define BUFFER_SIZE 8192
 
-/* ===== JSON ===== */
-int parse_patient(cJSON *json, parkinome_input_t *in);
-
-/* ===== read_file берём из json_io.c ===== */
-char* read_file(const char* filename);
-
-/* ===== HTTP response ===== */
+/* ===== HTTP ===== */
 void send_response(int client, const char *status, const char *type, const char *body) {
 
     char response[BUFFER_SIZE];
@@ -25,126 +21,76 @@ void send_response(int client, const char *status, const char *type, const char 
         "HTTP/1.1 %s\r\n"
         "Content-Type: %s\r\n"
         "Content-Length: %lu\r\n\r\n%s",
-        status,
-        type,
-        strlen(body),
-        body
+        status, type, strlen(body), body
     );
 
     write(client, response, strlen(response));
 }
 
-/* ===== FORM ===== */
-void handle_form(int client) {
+/* ===== ROLE ===== */
+const char* get_role(const char *path) {
 
-    char *json_data = read_file("patient.json");
+    char *role = strstr(path, "role=");
 
-    double age=0, updrs=0, moca=0, scopa=0, hy=0;
-    double ndufa4l2=0, ndufs2=0, pink1=0, ppargc1a=0;
-    double nlrp3=0, il1b=0, s100a8=0, cxcl8=0;
+    if (!role) return "unknown";
 
-    if (json_data) {
-        cJSON *json = cJSON_Parse(json_data);
-        free(json_data);
+    role += 5;
 
-        if (json) {
-            #define GET(name) cJSON_GetObjectItem(json, #name)->valuedouble
+    if (strstr(role, "doctor")) return "doctor";
+    if (strstr(role, "patient")) return "patient";
+    if (strstr(role, "pharma")) return "pharma";
 
-            age = GET(age);
-            updrs = GET(updrs_iii);
-            moca = GET(moca);
-            scopa = GET(scopa_aut);
-            hy = GET(hoehn_yahr);
+    return "unknown";
+}
 
-            ndufa4l2 = GET(ndufa4l2);
-            ndufs2 = GET(ndufs2);
-            pink1 = GET(pink1);
-            ppargc1a = GET(ppargc1a);
-            nlrp3 = GET(nlrp3);
-            il1b = GET(il1b);
-            s100a8 = GET(s100a8);
-            cxcl8 = GET(cxcl8);
+/* ===== STATIC ===== */
+void handle_static(int client, const char *path) {
 
-            cJSON_Delete(json);
-        }
+    char fullpath[256];
+    snprintf(fullpath, sizeof(fullpath), "web%s", path);
+
+    char *content = read_file(fullpath);
+
+    if (!content) {
+        log_error("Static file not found");
+        send_response(client, "404 Not Found", "text/plain", "File not found");
+        return;
     }
 
-    char html[BUFFER_SIZE * 2];
+    const char *type =
+        strstr(path, ".css") ? "text/css" :
+        strstr(path, ".js") ? "application/javascript" :
+        strstr(path, ".html") ? "text/html" :
+        "text/plain";
 
-    snprintf(html, sizeof(html),
-    "<!DOCTYPE html>"
-    "<html><head><style>"
-    "body{font-family:Arial;margin:0}"
-    ".container{display:flex;height:100vh}"
-    ".left,.right{width:50%%;padding:20px}"
-    ".left{background:#f5f5f5}"
-    ".right{background:#fff;border-left:1px solid #ddd}"
-    "input{width:100%%;margin-bottom:10px;padding:5px}"
-    "button{padding:10px;width:100%%;font-size:16px}"
-    "</style></head><body>"
+    send_response(client, "200 OK", type, content);
+    free(content);
+}
 
-    "<div class='container'>"
+/* ===== UI ===== */
+void handle_form(int client, const char *role) {
 
-    "<div class='left'>"
-    "<h2>Patient Input</h2>"
+    char filepath[256];
 
-    "Age<input id='age' value='%.1f'>"
-    "UPDRS III<input id='updrs' value='%.1f'>"
-    "MOCA<input id='moca' value='%.1f'>"
-    "SCOPA AUT<input id='scopa' value='%.1f'>"
-    "Hoehn-Yahr<input id='hy' value='%.1f'>"
+    if (strcmp(role, "doctor") == 0)
+        strcpy(filepath, "web/doctor.html");
+    else if (strcmp(role, "patient") == 0)
+        strcpy(filepath, "web/patient.html");
+    else if (strcmp(role, "pharma") == 0)
+        strcpy(filepath, "web/pharma.html");
+    else
+        strcpy(filepath, "web/index.html");
 
-    "<h3>Biomarkers</h3>"
-    "NDUFA4L2<input id='ndufa4l2' value='%.2f'>"
-    "NDUFS2<input id='ndufs2' value='%.2f'>"
-    "PINK1<input id='pink1' value='%.2f'>"
-    "PPARGC1A<input id='ppargc1a' value='%.2f'>"
-    "NLRP3<input id='nlrp3' value='%.2f'>"
-    "IL1B<input id='il1b' value='%.2f'>"
-    "S100A8<input id='s100a8' value='%.2f'>"
-    "CXCL8<input id='cxcl8' value='%.2f'>"
+    char *html = read_file(filepath);
 
-    "<button onclick='send()'>Predict</button>"
-    "</div>"
-
-    "<div class='right'>"
-    "<h2>Results</h2>"
-    "<pre id='result'>Loaded from patient.json</pre>"
-    "</div>"
-
-    "</div>"
-
-    "<script>"
-    "function send(){"
-    "let data={"
-    "age:+age.value,"
-    "updrs_iii:+updrs.value,"
-    "moca:+moca.value,"
-    "scopa_aut:+scopa.value,"
-    "hoehn_yahr:+hy.value,"
-    "ndufa4l2:+ndufa4l2.value,"
-    "ndufs2:+ndufs2.value,"
-    "pink1:+pink1.value,"
-    "ppargc1a:+ppargc1a.value,"
-    "nlrp3:+nlrp3.value,"
-    "il1b:+il1b.value,"
-    "s100a8:+s100a8.value,"
-    "cxcl8:+cxcl8.value};"
-
-    "fetch('/predict',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})"
-    ".then(r=>r.text())"
-    ".then(d=>result.innerText=d);"
-    "}"
-    "</script>"
-
-    "</body></html>",
-
-    age, updrs, moca, scopa, hy,
-    ndufa4l2, ndufs2, pink1, ppargc1a,
-    nlrp3, il1b, s100a8, cxcl8
-    );
+    if (!html) {
+        log_error("UI file not found");
+        send_response(client, "500 Internal Server Error", "text/plain", "UI not found");
+        return;
+    }
 
     send_response(client, "200 OK", "text/html", html);
+    free(html);
 }
 
 /* ===== HEALTH ===== */
@@ -155,44 +101,88 @@ void handle_health(int client) {
 /* ===== PREDICT ===== */
 void handle_predict(int client, char *body) {
 
-    cJSON *json = cJSON_Parse(body);
-    if (!json) {
-        send_response(client, "400 Bad Request", "text/plain", "Invalid JSON");
+    if (!body) {
+        log_error("Predict: no body");
+        send_response(client, "400 Bad Request", "text/plain", "No body");
         return;
     }
 
-    parkinome_input_t in = {0};
-    parkinome_output_t out = {0};
+    char result[512];
 
-    if (parse_patient(json, &in) != 0) {
-        cJSON_Delete(json);
-        send_response(client, "400 Bad Request", "text/plain", "Invalid input");
+    if (run_prediction(body, result, sizeof(result)) != 0) {
+        log_error("Prediction failed");
+        send_response(client, "400 Bad Request", "text/plain", "Prediction error");
         return;
     }
-
-    cJSON_Delete(json);
-
-    int status = parkinome_predict(&in, &out);
-    if (status != PARKINOME_OK) {
-        send_response(client, "500 Internal Server Error", "text/plain", "Model error");
-        return;
-    }
-
-    char result[256];
-
-    const char *cat =
-        (out.category == 0) ? "LOW" :
-        (out.category == 1) ? "INTERMEDIATE" :
-                              "HIGH";
-
-    snprintf(result, sizeof(result),
-        "{ \"isp\": %.3f, \"risk_probability\": %.3f, \"category\": \"%s\" }",
-        out.isp,
-        out.risk_probability,
-        cat
-    );
 
     send_response(client, "200 OK", "application/json", result);
+}
+
+/* ===== BATCH ===== */
+void handle_batch(int client, char *body, const char *role) {
+
+    if (strcmp(role, "pharma") != 0) {
+        send_response(client, "403 Forbidden", "text/plain", "Access denied");
+        return;
+    }
+
+    if (!body) {
+        log_error("Batch: no body");
+        send_response(client, "400 Bad Request", "text/plain", "No body");
+        return;
+    }
+
+    char result[4096];
+
+    if (run_batch(body, result, sizeof(result)) != 0) {
+        log_error("Batch failed");
+        send_response(client, "400 Bad Request", "text/plain", "Batch error");
+        return;
+    }
+
+    send_response(client, "200 OK", "application/json", result);
+}
+
+/* ===== STORAGE (SQLite) ===== */
+
+void handle_save(int client, char *body, const char *role) {
+
+    if (strcmp(role, "doctor") != 0) {
+        send_response(client, "403 Forbidden", "text/plain", "Access denied");
+        return;
+    }
+
+    if (!body) {
+        log_error("Save: no body");
+        send_response(client, "400 Bad Request", "text/plain", "No body");
+        return;
+    }
+
+    if (db_save_patient(body) != 0) {
+        log_error("DB save failed");
+        send_response(client, "500 Internal Server Error", "text/plain", "Save failed");
+        return;
+    }
+
+    send_response(client, "200 OK", "text/plain", "Saved");
+}
+
+void handle_get_patients(int client, const char *role) {
+
+    if (strcmp(role, "doctor") != 0) {
+        send_response(client, "403 Forbidden", "text/plain", "Access denied");
+        return;
+    }
+
+    char *data = db_get_patients();
+
+    if (!data) {
+        send_response(client, "200 OK", "application/json", "[]");
+        return;
+    }
+
+    send_response(client, "200 OK", "application/json", data);
+    free(data);
 }
 
 /* ===== MAIN ===== */
@@ -203,6 +193,9 @@ int main() {
     int addrlen = sizeof(address);
 
     char buffer[BUFFER_SIZE];
+
+    /* INIT DB */
+    db_init();
 
     server_fd = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -229,25 +222,47 @@ int main() {
 
         buffer[valread] = '\0';
 
-        char method[8], path[64];
+        char method[8], path[256];
         sscanf(buffer, "%s %s", method, path);
+
+        const char *role = get_role(path);
+
+        /* ===== LOG ===== */
+        char log_msg[256];
+        snprintf(log_msg, sizeof(log_msg), "%s %s [%s]", method, path, role);
+        log_info(log_msg);
 
         char *body = strstr(buffer, "\r\n\r\n");
         if (body) body += 4;
 
-        if (strcmp(method, "GET") == 0 && strcmp(path, "/") == 0) {
-            handle_form(client_socket);
+        /* ===== ROUTES ===== */
+
+        if (!strcmp(method, "GET") && !strncmp(path, "/", 1)) {
+            handle_form(client_socket, role);
         }
-        else if (strcmp(method, "GET") == 0 && strcmp(path, "/health") == 0) {
+        else if (!strcmp(method, "GET") && !strcmp(path, "/health")) {
             handle_health(client_socket);
         }
-        else if (strcmp(method, "POST") == 0 && strcmp(path, "/predict") == 0) {
-            if (body)
-                handle_predict(client_socket, body);
-            else
-                send_response(client_socket, "400 Bad Request", "text/plain", "No body");
+        else if (!strcmp(method, "GET") && strstr(path, ".css")) {
+            handle_static(client_socket, path);
+        }
+        else if (!strcmp(method, "GET") && strstr(path, ".js")) {
+            handle_static(client_socket, path);
+        }
+        else if (!strcmp(method, "POST") && !strcmp(path, "/predict")) {
+            handle_predict(client_socket, body);
+        }
+        else if (!strcmp(method, "POST") && !strcmp(path, "/batch")) {
+            handle_batch(client_socket, body, role);
+        }
+        else if (!strcmp(method, "POST") && !strcmp(path, "/patient")) {
+            handle_save(client_socket, body, role);
+        }
+        else if (!strcmp(method, "GET") && !strcmp(path, "/patients")) {
+            handle_get_patients(client_socket, role);
         }
         else {
+            log_error("Route not found");
             send_response(client_socket, "404 Not Found", "text/plain", "Not Found");
         }
 

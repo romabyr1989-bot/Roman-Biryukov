@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <cjson/cJSON.h>
 #include "predict.h"
+#include "json_io.h"
 
 /* =========================
    Read file
