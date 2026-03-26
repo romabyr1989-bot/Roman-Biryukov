@@ -1,0 +1,3 @@
+parkinome_server
+*.o
+.DS_Store
