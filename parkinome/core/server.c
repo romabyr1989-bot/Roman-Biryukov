@@ -13,10 +13,10 @@
 /* ===== JSON ===== */
 int parse_patient(cJSON *json, parkinome_input_t *in);
 
-/* =========================
-   HTTP response
-   ========================= */
+/* ===== read_file берём из json_io.c ===== */
+char* read_file(const char* filename);
 
+/* ===== HTTP response ===== */
 void send_response(int client, const char *status, const char *type, const char *body) {
 
     char response[BUFFER_SIZE];
@@ -24,9 +24,7 @@ void send_response(int client, const char *status, const char *type, const char 
     snprintf(response, sizeof(response),
         "HTTP/1.1 %s\r\n"
         "Content-Type: %s\r\n"
-        "Content-Length: %lu\r\n"
-        "\r\n"
-        "%s",
+        "Content-Length: %lu\r\n\r\n%s",
         status,
         type,
         strlen(body),
@@ -36,69 +34,125 @@ void send_response(int client, const char *status, const char *type, const char 
     write(client, response, strlen(response));
 }
 
-/* =========================
-   UI FORM
-   ========================= */
-
+/* ===== FORM ===== */
 void handle_form(int client) {
 
-    const char *html =
+    char *json_data = read_file("patient.json");
+
+    double age=0, updrs=0, moca=0, scopa=0, hy=0;
+    double ndufa4l2=0, ndufs2=0, pink1=0, ppargc1a=0;
+    double nlrp3=0, il1b=0, s100a8=0, cxcl8=0;
+
+    if (json_data) {
+        cJSON *json = cJSON_Parse(json_data);
+        free(json_data);
+
+        if (json) {
+            #define GET(name) cJSON_GetObjectItem(json, #name)->valuedouble
+
+            age = GET(age);
+            updrs = GET(updrs_iii);
+            moca = GET(moca);
+            scopa = GET(scopa_aut);
+            hy = GET(hoehn_yahr);
+
+            ndufa4l2 = GET(ndufa4l2);
+            ndufs2 = GET(ndufs2);
+            pink1 = GET(pink1);
+            ppargc1a = GET(ppargc1a);
+            nlrp3 = GET(nlrp3);
+            il1b = GET(il1b);
+            s100a8 = GET(s100a8);
+            cxcl8 = GET(cxcl8);
+
+            cJSON_Delete(json);
+        }
+    }
+
+    char html[BUFFER_SIZE * 2];
+
+    snprintf(html, sizeof(html),
     "<!DOCTYPE html>"
-    "<html><body>"
-    "<h2>Parkinome Predictor</h2>"
+    "<html><head><style>"
+    "body{font-family:Arial;margin:0}"
+    ".container{display:flex;height:100vh}"
+    ".left,.right{width:50%%;padding:20px}"
+    ".left{background:#f5f5f5}"
+    ".right{background:#fff;border-left:1px solid #ddd}"
+    "input{width:100%%;margin-bottom:10px;padding:5px}"
+    "button{padding:10px;width:100%%;font-size:16px}"
+    "</style></head><body>"
 
-    "<textarea id='json' rows='12' cols='50'>"
-    "{"
-    "\"age\":65,"
-    "\"updrs_iii\":24,"
-    "\"moca\":26,"
-    "\"scopa_aut\":15,"
-    "\"hoehn_yahr\":2,"
-    "\"ndufa4l2\":-0.3,"
-    "\"ndufs2\":-0.2,"
-    "\"pink1\":-0.4,"
-    "\"ppargc1a\":-0.1,"
-    "\"nlrp3\":0.8,"
-    "\"il1b\":0.7,"
-    "\"s100a8\":0.6,"
-    "\"cxcl8\":0.5"
-    "}"
-    "</textarea>"
+    "<div class='container'>"
 
-    "<br><br>"
+    "<div class='left'>"
+    "<h2>Patient Input</h2>"
+
+    "Age<input id='age' value='%.1f'>"
+    "UPDRS III<input id='updrs' value='%.1f'>"
+    "MOCA<input id='moca' value='%.1f'>"
+    "SCOPA AUT<input id='scopa' value='%.1f'>"
+    "Hoehn-Yahr<input id='hy' value='%.1f'>"
+
+    "<h3>Biomarkers</h3>"
+    "NDUFA4L2<input id='ndufa4l2' value='%.2f'>"
+    "NDUFS2<input id='ndufs2' value='%.2f'>"
+    "PINK1<input id='pink1' value='%.2f'>"
+    "PPARGC1A<input id='ppargc1a' value='%.2f'>"
+    "NLRP3<input id='nlrp3' value='%.2f'>"
+    "IL1B<input id='il1b' value='%.2f'>"
+    "S100A8<input id='s100a8' value='%.2f'>"
+    "CXCL8<input id='cxcl8' value='%.2f'>"
+
     "<button onclick='send()'>Predict</button>"
+    "</div>"
 
-    "<pre id='result'></pre>"
+    "<div class='right'>"
+    "<h2>Results</h2>"
+    "<pre id='result'>Loaded from patient.json</pre>"
+    "</div>"
+
+    "</div>"
 
     "<script>"
     "function send(){"
-    "fetch('/predict',{"
-    "method:'POST',"
-    "headers:{'Content-Type':'application/json'},"
-    "body:document.getElementById('json').value"
-    "})"
+    "let data={"
+    "age:+age.value,"
+    "updrs_iii:+updrs.value,"
+    "moca:+moca.value,"
+    "scopa_aut:+scopa.value,"
+    "hoehn_yahr:+hy.value,"
+    "ndufa4l2:+ndufa4l2.value,"
+    "ndufs2:+ndufs2.value,"
+    "pink1:+pink1.value,"
+    "ppargc1a:+ppargc1a.value,"
+    "nlrp3:+nlrp3.value,"
+    "il1b:+il1b.value,"
+    "s100a8:+s100a8.value,"
+    "cxcl8:+cxcl8.value};"
+
+    "fetch('/predict',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})"
     ".then(r=>r.text())"
-    ".then(d=>document.getElementById('result').innerText=d);"
+    ".then(d=>result.innerText=d);"
     "}"
     "</script>"
 
-    "</body></html>";
+    "</body></html>",
+
+    age, updrs, moca, scopa, hy,
+    ndufa4l2, ndufs2, pink1, ppargc1a,
+    nlrp3, il1b, s100a8, cxcl8
+    );
 
     send_response(client, "200 OK", "text/html", html);
 }
 
-/* =========================
-   HEALTH
-   ========================= */
-
+/* ===== HEALTH ===== */
 void handle_health(int client) {
     send_response(client, "200 OK", "text/plain", "Parkinome API is running");
 }
 
-/* =========================
-   PREDICT
-   ========================= */
-
+/* ===== PREDICT ===== */
 void handle_predict(int client, char *body) {
 
     cJSON *json = cJSON_Parse(body);
@@ -141,10 +195,7 @@ void handle_predict(int client, char *body) {
     send_response(client, "200 OK", "application/json", result);
 }
 
-/* =========================
-   MAIN
-   ========================= */
-
+/* ===== MAIN ===== */
 int main() {
 
     int server_fd, client_socket;
@@ -183,8 +234,6 @@ int main() {
 
         char *body = strstr(buffer, "\r\n\r\n");
         if (body) body += 4;
-
-        /* ===== ROUTES ===== */
 
         if (strcmp(method, "GET") == 0 && strcmp(path, "/") == 0) {
             handle_form(client_socket);
