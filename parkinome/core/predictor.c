@@ -2,20 +2,46 @@
 #include <stdlib.h>
 #include <string.h>
 #include <cjson/cJSON.h>
-#include "json_io.h"
+
 #include "predict.h"
-#include "json_io.h"
 
-/*
- Service layer:
- вход → JSON строка
- выход → JSON строка результата
-*/
+/* ===== PARSER ===== */
+int parse_patient(cJSON *json, parkinome_input_t *in) {
 
-int run_prediction(const char *input_json, char *output_json, size_t out_size) {
+    if (!json || !in) return PARKINOME_NULL_POINTER;
 
-    /* ===== parse ===== */
-    cJSON *json = cJSON_Parse(input_json);
+    memset(in, 0, sizeof(*in));
+
+    #define SET_FIELD(name) { \
+        cJSON *item = cJSON_GetObjectItem(json, #name); \
+        if (item) { \
+            in->name = item->valuedouble; \
+            in->has_##name = 1; \
+        } \
+    }
+
+    SET_FIELD(age);
+    SET_FIELD(updrs_iii);
+    SET_FIELD(moca);
+    SET_FIELD(scopa_aut);
+    SET_FIELD(hoehn_yahr);
+
+    SET_FIELD(ndufa4l2);
+    SET_FIELD(ndufs2);
+    SET_FIELD(pink1);
+    SET_FIELD(ppargc1a);
+    SET_FIELD(nlrp3);
+    SET_FIELD(il1b);
+    SET_FIELD(s100a8);
+    SET_FIELD(cxcl8);
+
+    return PARKINOME_OK;
+}
+
+/* ===== SINGLE ===== */
+int run_prediction(const char *body, char *result, size_t size) {
+
+    cJSON *json = cJSON_Parse(body);
     if (!json) return 1;
 
     parkinome_input_t in = {0};
@@ -23,73 +49,66 @@ int run_prediction(const char *input_json, char *output_json, size_t out_size) {
 
     if (parse_patient(json, &in) != 0) {
         cJSON_Delete(json);
-        return 2;
+        return 1;
     }
 
     cJSON_Delete(json);
 
-    /* ===== core ===== */
-    int status = parkinome_predict(&in, &out);
-    if (status != PARKINOME_OK) return 3;
+    if (parkinome_predict(&in, &out) != PARKINOME_OK) {
+        return 1;
+    }
 
-    /* ===== format output ===== */
     const char *cat =
         (out.category == 0) ? "LOW" :
         (out.category == 1) ? "INTERMEDIATE" :
                               "HIGH";
 
-    snprintf(output_json, out_size,
-        "{ \"isp\": %.3f, \"risk_probability\": %.3f, \"category\": \"%s\" }",
+    snprintf(result, size,
+        "{ \"isp\": %.3f, \"risk_probability\": %.3f, \"category\": \"%s\", \"confidence\": %.2f }",
         out.isp,
         out.risk_probability,
-        cat
+        cat,
+        out.confidence
     );
 
     return 0;
 }
-int run_batch(const char *input_json, char *output_json, size_t out_size) {
 
-    cJSON *array = cJSON_Parse(input_json);
+/* ===== BATCH ===== */
+int run_batch(const char *body, char *result, size_t size) {
+
+    cJSON *array = cJSON_Parse(body);
     if (!array || !cJSON_IsArray(array)) return 1;
 
-    cJSON *results = cJSON_CreateArray();
+    char buffer[4096] = "[";
+    int first = 1;
 
-    int size = cJSON_GetArraySize(array);
-
-    for (int i = 0; i < size; i++) {
+    for (int i = 0; i < cJSON_GetArraySize(array); i++) {
 
         cJSON *item = cJSON_GetArrayItem(array, i);
 
-        parkinome_input_t in = {0};
-        parkinome_output_t out = {0};
+        char res[512];
 
-        if (parse_patient(item, &in) != 0)
+        char *str = cJSON_PrintUnformatted(item);
+        if (!str) continue;
+
+        if (run_prediction(str, res, sizeof(res)) != 0) {
+            free(str);
             continue;
+        }
 
-        if (parkinome_predict(&in, &out) != PARKINOME_OK)
-            continue;
+        free(str);
 
-        const char *cat =
-            (out.category == 0) ? "LOW" :
-            (out.category == 1) ? "INTERMEDIATE" :
-                                  "HIGH";
+        if (!first) strcat(buffer, ",");
+        strcat(buffer, res);
 
-        cJSON *res = cJSON_CreateObject();
-
-        cJSON_AddNumberToObject(res, "isp", out.isp);
-        cJSON_AddNumberToObject(res, "risk_probability", out.risk_probability);
-        cJSON_AddStringToObject(res, "category", cat);
-
-        cJSON_AddItemToArray(results, res);
+        first = 0;
     }
 
-    char *str = cJSON_PrintUnformatted(results);
+    strcat(buffer, "]");
 
-    strncpy(output_json, str, out_size);
+    strncpy(result, buffer, size);
 
-    free(str);
-    cJSON_Delete(results);
     cJSON_Delete(array);
-
     return 0;
 }

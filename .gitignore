@@ -2,3 +2,6 @@ parkinome_server
 *.db
 *.log
 .DS_Store
+parkinome_server
+*.db
+*.log
