@@ -8,6 +8,7 @@
 #include "json_io.h"
 #include "logger.h"
 #include "storage_sqlite.h"
+#include "auth.h"
 
 #define PORT 8080
 #define BUFFER_SIZE 8192
@@ -25,22 +26,6 @@ void send_response(int client, const char *status, const char *type, const char 
     );
 
     write(client, response, strlen(response));
-}
-
-/* ===== ROLE ===== */
-const char* get_role(const char *path) {
-
-    char *role = strstr(path, "role=");
-
-    if (!role) return "unknown";
-
-    role += 5;
-
-    if (strstr(role, "doctor")) return "doctor";
-    if (strstr(role, "patient")) return "patient";
-    if (strstr(role, "pharma")) return "pharma";
-
-    return "unknown";
 }
 
 /* ===== STATIC ===== */
@@ -68,23 +53,12 @@ void handle_static(int client, const char *path) {
 }
 
 /* ===== UI ===== */
-void handle_form(int client, const char *role) {
+void handle_form(int client) {
 
-    char filepath[256];
-
-    if (strcmp(role, "doctor") == 0)
-        strcpy(filepath, "web/doctor.html");
-    else if (strcmp(role, "patient") == 0)
-        strcpy(filepath, "web/patient.html");
-    else if (strcmp(role, "pharma") == 0)
-        strcpy(filepath, "web/pharma.html");
-    else
-        strcpy(filepath, "web/index.html");
-
-    char *html = read_file(filepath);
+    char *html = read_file("web/index.html");
 
     if (!html) {
-        log_error("UI file not found");
+        log_error("UI not found");
         send_response(client, "500 Internal Server Error", "text/plain", "UI not found");
         return;
     }
@@ -96,6 +70,27 @@ void handle_form(int client, const char *role) {
 /* ===== HEALTH ===== */
 void handle_health(int client) {
     send_response(client, "200 OK", "text/plain", "Parkinome API is running");
+}
+
+/* ===== LOGIN ===== */
+void handle_login(int client, char *body) {
+
+    if (!body) {
+        send_response(client, "400 Bad Request", "text/plain", "No body");
+        return;
+    }
+
+    const char *token = auth_login(body);
+
+    if (!token) {
+        send_response(client, "401 Unauthorized", "text/plain", "Invalid login");
+        return;
+    }
+
+    char response[128];
+    snprintf(response, sizeof(response), "{ \"token\": \"%s\" }", token);
+
+    send_response(client, "200 OK", "application/json", response);
 }
 
 /* ===== PREDICT ===== */
@@ -143,8 +138,7 @@ void handle_batch(int client, char *body, const char *role) {
     send_response(client, "200 OK", "application/json", result);
 }
 
-/* ===== STORAGE (SQLite) ===== */
-
+/* ===== STORAGE ===== */
 void handle_save(int client, char *body, const char *role) {
 
     if (strcmp(role, "doctor") != 0) {
@@ -194,7 +188,6 @@ int main() {
 
     char buffer[BUFFER_SIZE];
 
-    /* INIT DB */
     db_init();
 
     server_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -225,7 +218,20 @@ int main() {
         char method[8], path[256];
         sscanf(buffer, "%s %s", method, path);
 
-        const char *role = get_role(path);
+        /* ===== TOKEN ===== */
+        char *auth = strstr(buffer, "Authorization: Bearer ");
+        const char *role = "unknown";
+
+        if (auth) {
+            auth += strlen("Authorization: Bearer ");
+            char *end = strstr(auth, "\r\n");
+
+            char token[64];
+            strncpy(token, auth, end - auth);
+            token[end - auth] = '\0';
+
+            role = auth_get_role(token);
+        }
 
         /* ===== LOG ===== */
         char log_msg[256];
@@ -237,8 +243,8 @@ int main() {
 
         /* ===== ROUTES ===== */
 
-        if (!strcmp(method, "GET") && !strncmp(path, "/", 1)) {
-            handle_form(client_socket, role);
+        if (!strcmp(method, "GET") && !strcmp(path, "/")) {
+            handle_form(client_socket);
         }
         else if (!strcmp(method, "GET") && !strcmp(path, "/health")) {
             handle_health(client_socket);
@@ -248,6 +254,9 @@ int main() {
         }
         else if (!strcmp(method, "GET") && strstr(path, ".js")) {
             handle_static(client_socket, path);
+        }
+        else if (!strcmp(method, "POST") && !strcmp(path, "/login")) {
+            handle_login(client_socket, body);
         }
         else if (!strcmp(method, "POST") && !strcmp(path, "/predict")) {
             handle_predict(client_socket, body);

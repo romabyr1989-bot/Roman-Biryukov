@@ -1,0 +1,5 @@
+[
+  {"login": "doctor", "password": "123", "role": "doctor"},
+  {"login": "patient", "password": "123", "role": "patient"},
+  {"login": "pharma", "password": "123", "role": "pharma"}
+]
