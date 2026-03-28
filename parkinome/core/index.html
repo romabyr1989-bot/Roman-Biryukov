@@ -1,130 +1,454 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Parkinome</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Parkinome Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
-body{font-family:-apple-system;background:#f5f5f5;margin:0;}
-.top{background:#000;color:#fff;padding:10px;}
-.container{display:flex;height:90vh;}
-.left{width:50%;padding:20px;}
-.right{width:50%;padding:20px;background:#fff;}
-.hidden{display:none;}
-.low{color:green;}
-.mid{color:orange;}
-.high{color:red;}
+:root {
+  --bg-1: #f3f1ea;
+  --bg-2: #d9e4dd;
+  --panel: rgba(255, 255, 255, 0.78);
+  --panel-strong: rgba(255, 255, 255, 0.92);
+  --text: #112217;
+  --muted: #4f5f54;
+  --line: #cad5cd;
+  --accent: #0f6b4a;
+  --accent-soft: #e2f2eb;
+  --warn: #b36a09;
+  --high: #a22f2f;
+  --ok: #1e7a3f;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Space Grotesk", sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 12% 18%, #ffffffb8 0%, transparent 42%),
+    radial-gradient(circle at 88% 82%, #eef8f1 0%, transparent 50%),
+    linear-gradient(135deg, var(--bg-1), var(--bg-2));
+}
+
+.page {
+  max-width: 1150px;
+  margin: 0 auto;
+  padding: 22px 16px 28px;
+}
+
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.brand {
+  font-size: clamp(22px, 4.5vw, 34px);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.role-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 12px;
+  backdrop-filter: blur(6px);
+}
+
+select {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 12px;
+  font: inherit;
+  background: #fff;
+  color: var(--text);
+}
+
+.role-pill {
+  padding: 6px 11px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 14px;
+}
+
+.panel {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--panel);
+  backdrop-filter: blur(7px);
+  padding: 16px;
+  box-shadow: 0 10px 30px rgba(17, 34, 23, 0.08);
+}
+
+.hidden { display: none !important; }
+
+h2 {
+  margin: 0 0 10px;
+  font-size: clamp(18px, 3.5vw, 24px);
+}
+
+p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.form-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.field label {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 4px;
+  color: var(--muted);
+}
+
+.field input,
+textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: var(--panel-strong);
+  border-radius: 12px;
+  padding: 10px;
+  font: inherit;
+  color: var(--text);
+}
+
+textarea {
+  min-height: 240px;
+  resize: vertical;
+}
+
+.actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+}
+
+button {
+  border: none;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.btn-ghost {
+  background: #fff;
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+
+.result {
+  display: grid;
+  gap: 10px;
+}
+
+.metric {
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--panel-strong);
+}
+
+.metric .k {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.metric .v {
+  margin-top: 2px;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.v.low { color: var(--ok); }
+.v.mid { color: var(--warn); }
+.v.high { color: var(--high); }
+
+.code {
+  margin-top: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #f8fbf9;
+  padding: 10px;
+  min-height: 72px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 13px;
+}
+
+.notice {
+  margin-top: 10px;
+  border-radius: 12px;
+  padding: 10px;
+  font-size: 13px;
+  background: #fff8e8;
+  border: 1px solid #ead7aa;
+  color: #7a5b10;
+}
+
+@media (max-width: 920px) {
+  .grid { grid-template-columns: 1fr; }
+  .form-grid { grid-template-columns: 1fr; }
+}
 </style>
 </head>
-
 <body>
+  <div class="page">
+    <div class="topbar">
+      <div class="brand">Parkinome Console</div>
+      <div class="role-wrap">
+        <span style="font-size:13px;color:var(--muted)">Token</span>
+        <select id="token" onchange="loadRole()">
+          <option value="token_doctor">Doctor</option>
+          <option value="token_research">Researcher</option>
+          <option value="token_admin">Admin</option>
+        </select>
+        <span id="roleLabel" class="role-pill">NONE</span>
+      </div>
+    </div>
 
-<div class="top">
-Role:
-<select id="token" onchange="loadRole()">
-<option value="token_doctor">Doctor</option>
-<option value="token_research">Researcher</option>
-<option value="token_admin">Admin</option>
-</select>
-<span id="roleLabel"></span>
-</div>
+    <div id="doctorUI" class="grid">
+      <section class="panel">
+        <h2>Single Patient Prediction</h2>
+        <p>Заполни любое количество полей. Модель сама учтёт доступные группы признаков.</p>
 
-<div id="doctorUI" class="container">
-<div class="left">
-<input id="age" placeholder="Age"><br><br>
-<input id="updrs" placeholder="UPDRS"><br><br>
-<button onclick="predict()">Predict</button>
-</div>
-<div class="right">
-<div id="risk">-</div>
-<div id="category">-</div>
-</div>
-</div>
+        <div class="form-grid">
+          <div class="field"><label>Age</label><input id="age" type="number" placeholder="e.g. 67"></div>
+          <div class="field"><label>UPDRS III</label><input id="updrs" type="number" placeholder="e.g. 38"></div>
+          <div class="field"><label>MOCA</label><input id="moca" type="number" placeholder="e.g. 22"></div>
+          <div class="field"><label>SCOPA AUT</label><input id="scopa" type="number" placeholder="e.g. 24"></div>
+          <div class="field"><label>Hoehn-Yahr</label><input id="hy" type="number" step="0.1" placeholder="e.g. 2.5"></div>
+          <div class="field"><label>NDUFA4L2</label><input id="ndufa4l2" type="number" step="0.01" placeholder="e.g. 4.1"></div>
+          <div class="field"><label>NDUFS2</label><input id="ndufs2" type="number" step="0.01" placeholder="e.g. 3.8"></div>
+          <div class="field"><label>PINK1</label><input id="pink1" type="number" step="0.01" placeholder="e.g. 2.2"></div>
+          <div class="field"><label>PPARGC1A</label><input id="ppargc1a" type="number" step="0.01" placeholder="e.g. 3.4"></div>
+          <div class="field"><label>NLRP3</label><input id="nlrp3" type="number" step="0.01" placeholder="e.g. 6.1"></div>
+          <div class="field"><label>IL1B</label><input id="il1b" type="number" step="0.01" placeholder="e.g. 5.2"></div>
+          <div class="field"><label>S100A8</label><input id="s100a8" type="number" step="0.01" placeholder="e.g. 4.9"></div>
+          <div class="field"><label>CXCL8</label><input id="cxcl8" type="number" step="0.01" placeholder="e.g. 5.6"></div>
+        </div>
 
-<div id="researchUI" class="container hidden">
-<textarea id="batch"></textarea>
-<button onclick="runBatch()">Run batch</button>
-<pre id="out"></pre>
-</div>
+        <div class="actions">
+          <button class="btn-primary" onclick="predict()">Run Prediction</button>
+          <button class="btn-ghost" onclick="clearDoctorForm()">Clear</button>
+        </div>
+      </section>
 
-<div id="adminUI" class="container hidden">
-<h2>Admin panel</h2>
-</div>
+      <aside class="panel">
+        <h2>Result</h2>
+        <div class="result">
+          <div class="metric">
+            <div class="k">Risk Probability</div>
+            <div id="risk" class="v">-</div>
+          </div>
+          <div class="metric">
+            <div class="k">Category</div>
+            <div id="category" class="v">-</div>
+          </div>
+          <div class="metric">
+            <div class="k">Confidence</div>
+            <div id="confidence" class="v">-</div>
+          </div>
+          <div class="metric">
+            <div class="k">ISP</div>
+            <div id="isp" class="v">-</div>
+          </div>
+        </div>
+        <div id="doctorError" class="notice hidden"></div>
+      </aside>
+    </div>
+
+    <section id="researchUI" class="panel hidden">
+      <h2>Batch Mode</h2>
+      <p>Вставь JSON-массив пациентов и запусти массовый расчёт.</p>
+      <div class="actions">
+        <button class="btn-primary" onclick="runBatch()">Run Batch</button>
+        <button class="btn-ghost" onclick="setBatchExample()">Insert Example</button>
+      </div>
+      <div style="margin-top:10px">
+        <textarea id="batch" placeholder='[{"age":65,"updrs_iii":31},{"age":71,"moca":20,"nlrp3":7.2}]'></textarea>
+      </div>
+      <div id="out" class="code">-</div>
+    </section>
+
+    <section id="adminUI" class="panel hidden">
+      <h2>Admin</h2>
+      <p>Админ имеет доступ к обоим endpoint: <code>/predict</code> и <code>/batch</code>.</p>
+      <div class="notice" style="margin-top:10px">Текущая авторизация токеновая и демонстрационная. Для production лучше добавить полноценную проверку токенов и срок действия.</div>
+    </section>
+  </div>
 
 <script>
-
 let currentToken = "token_doctor";
 
-function loadRole(){
+function n(v) {
+  if (v === '' || v === null || v === undefined) return undefined;
+  const x = Number(v);
+  return Number.isFinite(x) ? x : undefined;
+}
 
-    currentToken = token.value;
-
-    fetch('/me',{
-        headers:{'Authorization':'Bearer ' + currentToken}
+function loadRole() {
+  currentToken = token.value;
+  fetch('/me', { headers: { Authorization: 'Bearer ' + currentToken } })
+    .then(r => r.json())
+    .then(data => {
+      const role = data.role || 'none';
+      roleLabel.innerText = role.toUpperCase();
+      applyRole(role);
     })
-    .then(r=>r.json())
-    .then(data=>{
-        roleLabel.innerText = " (" + data.role + ")";
-        applyRole(data.role);
+    .catch(() => {
+      roleLabel.innerText = 'NONE';
+      applyRole('none');
     });
 }
 
-function applyRole(role){
+function applyRole(role) {
+  doctorUI.classList.add('hidden');
+  researchUI.classList.add('hidden');
+  adminUI.classList.add('hidden');
 
-    doctorUI.classList.add("hidden");
-    researchUI.classList.add("hidden");
-    adminUI.classList.add("hidden");
-
-    if(role==="doctor") doctorUI.classList.remove("hidden");
-    if(role==="researcher") researchUI.classList.remove("hidden");
-    if(role==="admin") adminUI.classList.remove("hidden");
+  if (role === 'doctor') doctorUI.classList.remove('hidden');
+  if (role === 'researcher') researchUI.classList.remove('hidden');
+  if (role === 'admin') {
+    doctorUI.classList.remove('hidden');
+    researchUI.classList.remove('hidden');
+    adminUI.classList.remove('hidden');
+  }
 }
 
-function predict(){
-
-    let data = {
-        age:+age.value || undefined,
-        updrs_iii:+updrs.value || undefined
-    };
-
-    fetch('/predict',{
-        method:'POST',
-        headers:{
-            'Content-Type':'application/json',
-            'Authorization':'Bearer ' + currentToken
-        },
-        body:JSON.stringify(data)
-    })
-    .then(r=>r.json())
-    .then(res=>{
-        let rsk = res.risk_probability;
-
-        risk.innerText = (rsk*100).toFixed(1)+"%";
-        category.innerText = res.category;
-
-        risk.className="";
-        if(rsk<0.33) risk.classList.add("low");
-        else if(rsk<0.66) risk.classList.add("mid");
-        else risk.classList.add("high");
-    });
+function clearDoctorForm() {
+  [age, updrs, moca, scopa, hy, ndufa4l2, ndufs2, pink1, ppargc1a, nlrp3, il1b, s100a8, cxcl8].forEach(i => i.value = '');
+  risk.innerText = '-';
+  category.innerText = '-';
+  confidence.innerText = '-';
+  isp.innerText = '-';
+  doctorError.classList.add('hidden');
 }
 
-function runBatch(){
+function buildDoctorPayload() {
+  const raw = {
+    age: n(age.value),
+    updrs_iii: n(updrs.value),
+    moca: n(moca.value),
+    scopa_aut: n(scopa.value),
+    hoehn_yahr: n(hy.value),
+    ndufa4l2: n(ndufa4l2.value),
+    ndufs2: n(ndufs2.value),
+    pink1: n(pink1.value),
+    ppargc1a: n(ppargc1a.value),
+    nlrp3: n(nlrp3.value),
+    il1b: n(il1b.value),
+    s100a8: n(s100a8.value),
+    cxcl8: n(cxcl8.value)
+  };
 
-    fetch('/batch',{
-        method:'POST',
-        headers:{
-            'Content-Type':'application/json',
-            'Authorization':'Bearer ' + currentToken
-        },
-        body:batch.value
+  return Object.fromEntries(
+    Object.entries(raw).filter(([, value]) => value !== undefined)
+  );
+}
+
+function classByRisk(v) {
+  if (v < 0.33) return 'low';
+  if (v < 0.66) return 'mid';
+  return 'high';
+}
+
+function showDoctorError(msg) {
+  doctorError.innerText = msg;
+  doctorError.classList.remove('hidden');
+}
+
+function predict() {
+  doctorError.classList.add('hidden');
+  fetch('/predict', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + currentToken
+    },
+    body: JSON.stringify(buildDoctorPayload())
+  })
+    .then(async r => {
+      const txt = await r.text();
+      if (!r.ok) throw new Error(txt || ('HTTP ' + r.status));
+      return JSON.parse(txt);
     })
-    .then(r=>r.text())
-    .then(d=>out.innerText=d);
+    .then(res => {
+      const rp = Number(res.risk_probability);
+      risk.className = 'v ' + classByRisk(rp);
+      category.className = 'v ' + classByRisk(rp);
+
+      risk.innerText = Number.isFinite(rp) ? (rp * 100).toFixed(1) + '%' : '-';
+      category.innerText = res.category || '-';
+      confidence.innerText = typeof res.confidence === 'number' ? res.confidence.toFixed(2) : '-';
+      isp.innerText = typeof res.isp === 'number' ? res.isp.toFixed(3) : '-';
+    })
+    .catch(err => showDoctorError('Prediction failed: ' + err.message));
+}
+
+function setBatchExample() {
+  batch.value = JSON.stringify([
+    { age: 65, updrs_iii: 31, moca: 23, hoehn_yahr: 2 },
+    { age: 71, updrs_iii: 48, nlrp3: 7.2, il1b: 6.4, cxcl8: 6.8 }
+  ], null, 2);
+}
+
+function runBatch() {
+  fetch('/batch', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + currentToken
+    },
+    body: batch.value
+  })
+    .then(async r => {
+      const txt = await r.text();
+      if (!r.ok) throw new Error(txt || ('HTTP ' + r.status));
+      return txt;
+    })
+    .then(txt => { out.innerText = txt; })
+    .catch(err => { out.innerText = 'Batch failed: ' + err.message; });
 }
 
 loadRole();
-
 </script>
-
 </body>
 </html>
