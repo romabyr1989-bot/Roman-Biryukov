@@ -12,6 +12,15 @@ int parse_patient(cJSON *json, parkinome_input_t *in) {
 
     memset(in, 0, sizeof(*in));
 
+    cJSON *pid = cJSON_GetObjectItem(json, "patient_id");
+    if (pid && cJSON_IsString(pid) && pid->valuestring) {
+        snprintf(in->patient_id, sizeof(in->patient_id), "%s", pid->valuestring);
+        in->has_patient_id = 1;
+    } else if (pid && cJSON_IsNumber(pid)) {
+        snprintf(in->patient_id, sizeof(in->patient_id), "%.0f", pid->valuedouble);
+        in->has_patient_id = 1;
+    }
+
     /* Копируем только поля, которые есть в JSON, и выставляем флаги has_* для модели. */
     #define SET_FIELD(name) { \
         cJSON *item = cJSON_GetObjectItem(json, #name); \
@@ -65,13 +74,24 @@ int run_prediction(const char *body, char *result, size_t size) {
         (out.category == 1) ? "INTERMEDIATE" :
                               "HIGH";
 
-    snprintf(result, size,
-        "{ \"isp\": %.3f, \"risk_probability\": %.3f, \"category\": \"%s\", \"confidence\": %.2f }",
-        out.isp,
-        out.risk_probability,
-        cat,
-        out.confidence
-    );
+    if (in.has_patient_id) {
+        snprintf(result, size,
+            "{ \"patient_id\": \"%s\", \"isp\": %.3f, \"risk_probability\": %.3f, \"category\": \"%s\", \"confidence\": %.2f }",
+            in.patient_id,
+            out.isp,
+            out.risk_probability,
+            cat,
+            out.confidence
+        );
+    } else {
+        snprintf(result, size,
+            "{ \"isp\": %.3f, \"risk_probability\": %.3f, \"category\": \"%s\", \"confidence\": %.2f }",
+            out.isp,
+            out.risk_probability,
+            cat,
+            out.confidence
+        );
+    }
 
     return 0;
 }

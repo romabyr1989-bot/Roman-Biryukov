@@ -11,6 +11,9 @@
 /* ===== ВХОДНЫЕ ДАННЫЕ ===== */
 typedef struct {
 
+    /* идентификатор пациента */
+    char patient_id[64]; int has_patient_id;
+
     /* клинические */
     double age; int has_age;
     double updrs_iii; int has_updrs_iii;

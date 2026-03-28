@@ -247,6 +247,7 @@ button {
         <p>Заполни любое количество полей. Модель сама учтёт доступные группы признаков.</p>
 
         <div class="form-grid">
+          <div class="field"><label>Patient ID</label><input id="patient_id" type="text" placeholder="e.g. P-1024"></div>
           <div class="field"><label>Age (30-90)</label><input id="age" type="number" min="30" max="90" step="1" placeholder="e.g. 67"></div>
           <div class="field"><label>UPDRS III (0-132)</label><input id="updrs" type="number" min="0" max="132" step="1" placeholder="e.g. 38"></div>
           <div class="field"><label>MOCA (0-30)</label><input id="moca" type="number" min="0" max="30" step="1" placeholder="e.g. 22"></div>
@@ -262,10 +263,11 @@ button {
           <div class="field"><label>CXCL8 (-10..10)</label><input id="cxcl8" type="number" min="-10" max="10" step="0.01" placeholder="e.g. 5.6"></div>
         </div>
 
-        <div class="actions">
-          <button id="btnPredict" type="button" class="btn-primary">Run Prediction</button>
-          <button id="btnClear" type="button" class="btn-ghost">Clear</button>
-        </div>
+      <div class="actions">
+        <button id="btnPredict" type="button" class="btn-primary">Run Prediction</button>
+        <button id="btnSaveDb" type="button" class="btn-ghost">Save To DB</button>
+        <button id="btnClear" type="button" class="btn-ghost">Clear</button>
+      </div>
       </section>
 
       <aside class="panel">
@@ -310,6 +312,8 @@ button {
 <script>
 (() => {
   let currentToken = "token_admin";
+  let lastPredictInput = null;
+  let lastPredictOutput = null;
   const $ = (id) => document.getElementById(id);
 
   function n(v) {
@@ -339,6 +343,7 @@ button {
   function buildDoctorPayload() {
     // Отправляем только заполненные поля, чтобы сервер корректно определял доступные группы.
     const raw = {
+      patient_id: $("patient_id").value.trim() || undefined,
       age: n($("age").value),
       updrs_iii: n($("updrs").value),
       moca: n($("moca").value),
@@ -389,13 +394,15 @@ button {
   }
 
   function clearDoctorForm() {
-    ["age","updrs","moca","scopa","hy","ndufa4l2","ndufs2","pink1","ppargc1a","nlrp3","il1b","s100a8","cxcl8"]
+    ["patient_id","age","updrs","moca","scopa","hy","ndufa4l2","ndufs2","pink1","ppargc1a","nlrp3","il1b","s100a8","cxcl8"]
       .forEach((id) => { $(id).value = ""; });
     $("risk").innerText = "-";
     $("category").innerText = "-";
     $("confidence").innerText = "-";
     $("isp").innerText = "-";
     $("doctorError").classList.add("hidden");
+    lastPredictInput = null;
+    lastPredictOutput = null;
   }
 
   async function loadRole() {
@@ -432,6 +439,8 @@ button {
       const txt = await r.text();
       if (!r.ok) throw new Error(txt || ("HTTP " + r.status));
       const res = JSON.parse(txt);
+      lastPredictInput = payload;
+      lastPredictOutput = res;
 
       const rp = Number(res.risk_probability);
       $("risk").className = "v " + classByRisk(rp);
@@ -445,10 +454,34 @@ button {
     }
   }
 
+  async function saveToDb() {
+    $("doctorError").classList.add("hidden");
+    try {
+      if (!lastPredictInput || !lastPredictOutput) {
+        throw new Error("Сначала выполните прогноз, потом сохраняйте в БД.");
+      }
+
+      const r = await fetch("/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + currentToken },
+        body: JSON.stringify({
+          input: lastPredictInput,
+          output: lastPredictOutput
+        })
+      });
+
+      const txt = await r.text();
+      if (!r.ok) throw new Error(txt || ("HTTP " + r.status));
+      showDoctorError("Сохранено в БД.");
+    } catch (err) {
+      showDoctorError("Сохранение не выполнено: " + err.message);
+    }
+  }
+
   function setBatchExample() {
     $("batch").value = JSON.stringify([
-      { age: 65, updrs_iii: 31, moca: 23, hoehn_yahr: 2 },
-      { age: 71, updrs_iii: 48, nlrp3: 7.2, il1b: 6.4, cxcl8: 6.8 }
+      { patient_id: "P-1001", age: 65, updrs_iii: 31, moca: 23, hoehn_yahr: 2 },
+      { patient_id: "P-1002", age: 71, updrs_iii: 48, nlrp3: 7.2, il1b: 6.4, cxcl8: 6.8 }
     ], null, 2);
   }
 
@@ -468,6 +501,7 @@ button {
   }
 
   $("btnPredict")?.addEventListener("click", predict);
+  $("btnSaveDb")?.addEventListener("click", saveToDb);
   $("btnClear")?.addEventListener("click", clearDoctorForm);
   $("btnBatchRun")?.addEventListener("click", runBatch);
   $("btnBatchExample")?.addEventListener("click", setBatchExample);

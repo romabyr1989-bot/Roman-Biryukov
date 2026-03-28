@@ -3,10 +3,12 @@
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <cjson/cJSON.h>
 
 #include "predict.h"
 #include "predictor.h"
 #include "json_io.h"   // Чтение файлов для отдачи HTML
+#include "db.h"
 
 #define PORT 8080
 #define BUFFER_SIZE 8192
@@ -80,6 +82,8 @@ void handle_predict(int client, char *body) {
         return;
     }
 
+    /* Ошибка сохранения в БД не должна ломать ответ пользователю. */
+    db_save_prediction(body, result);
     send_response(client, "200 OK", "application/json", result);
 }
 
@@ -92,7 +96,56 @@ void handle_batch(int client, char *body) {
         return;
     }
 
+    /* Ошибка сохранения в БД не должна ломать ответ пользователю. */
+    db_save_batch(body, result);
     send_response(client, "200 OK", "application/json", result);
+}
+
+void handle_save(int client, char *body) {
+    if (!body) {
+        send_response(client, "400 Bad Request", "text/plain", "Error");
+        return;
+    }
+
+    cJSON *root = cJSON_Parse(body);
+    if (!root || !cJSON_IsObject(root)) {
+        if (root) cJSON_Delete(root);
+        send_response(client, "400 Bad Request", "text/plain", "Invalid JSON");
+        return;
+    }
+
+    cJSON *input = cJSON_GetObjectItem(root, "input");
+    cJSON *output = cJSON_GetObjectItem(root, "output");
+
+    if (!input || !output || !cJSON_IsObject(input) || !cJSON_IsObject(output)) {
+        cJSON_Delete(root);
+        send_response(client, "400 Bad Request", "text/plain", "Invalid payload");
+        return;
+    }
+
+    char *input_json = cJSON_PrintUnformatted(input);
+    char *output_json = cJSON_PrintUnformatted(output);
+
+    if (!input_json || !output_json) {
+        if (input_json) free(input_json);
+        if (output_json) free(output_json);
+        cJSON_Delete(root);
+        send_response(client, "500 Internal Server Error", "text/plain", "Serialize error");
+        return;
+    }
+
+    int rc = db_save_prediction(input_json, output_json);
+
+    free(input_json);
+    free(output_json);
+    cJSON_Delete(root);
+
+    if (rc != 0) {
+        send_response(client, "500 Internal Server Error", "text/plain", "DB error");
+        return;
+    }
+
+    send_response(client, "200 OK", "application/json", "{ \"status\": \"saved\" }");
 }
 
 /* ===== ОСНОВНОЙ ЦИКЛ СЕРВЕРА ===== */
@@ -103,6 +156,10 @@ int main() {
     int addrlen = sizeof(address);
 
     char buffer[BUFFER_SIZE];
+
+    if (db_init() != 0) {
+        fprintf(stderr, "Ошибка инициализации БД\n");
+    }
 
     server_fd = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -171,6 +228,22 @@ int main() {
         /* ===== МАРШРУТ /batch ===== */
         else if (!strcmp(method, "POST") && !strcmp(path, "/batch")) {
             handle_batch(client_socket, body);
+        }
+
+        /* ===== МАРШРУТ /save ===== */
+        else if (!strcmp(method, "POST") && !strcmp(path, "/save")) {
+            handle_save(client_socket, body);
+        }
+
+        /* ===== МАРШРУТ /history ===== */
+        else if (!strcmp(method, "GET") && !strcmp(path, "/history")) {
+            char *history = db_get_predictions_json(50);
+            if (!history) {
+                send_response(client_socket, "500 Internal Server Error", "text/plain", "DB error");
+            } else {
+                send_response(client_socket, "200 OK", "application/json", history);
+                free(history);
+            }
         }
 
         else {
