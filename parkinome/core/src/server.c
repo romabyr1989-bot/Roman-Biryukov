@@ -6,12 +6,28 @@
 
 #include "predict.h"
 #include "predictor.h"
-#include "auth.h"
-#include "json_io.h"   // ✅ используем read_file отсюда
+#include "json_io.h"   // Чтение файлов для отдачи HTML
 
 #define PORT 8080
 #define BUFFER_SIZE 8192
 
+static char* read_ui_file(void) {
+    const char *candidates[] = {
+        "web/index.html",
+        "./web/index.html",
+        "parkinome/core/web/index.html",
+        "./parkinome/core/web/index.html"
+    };
+
+    for (size_t i = 0; i < sizeof(candidates) / sizeof(candidates[0]); i++) {
+        char *html = read_file(candidates[i]);
+        if (html) return html;
+    }
+
+    return NULL;
+}
+
+/* Системный вызов write() может отправить только часть буфера, поэтому пишем до конца. */
 static int write_all(int fd, const char *data, size_t len) {
     size_t sent = 0;
     while (sent < len) {
@@ -22,7 +38,8 @@ static int write_all(int fd, const char *data, size_t len) {
     return 0;
 }
 
-/* ===== RESPONSE ===== */
+/* ===== ОТВЕТ ===== */
+/* Формируем HTTP-ответ динамически: HTML может быть больше фиксированного буфера. */
 void send_response(int client, const char *status, const char *type, const char *body) {
 
     size_t body_len = strlen(body);
@@ -53,26 +70,7 @@ void send_response(int client, const char *status, const char *type, const char 
     free(response);
 }
 
-/* ===== AUTH HEADER ===== */
-char* get_auth_header(char *request) {
-
-    char *auth = strstr(request, "Authorization:");
-    if (!auth) auth = strstr(request, "authorization:");
-    if (!auth) return NULL;
-
-    char *end = strstr(auth, "\r\n");
-    if (!end) return NULL;
-
-    static char header[256];
-    int len = end - auth;
-
-    strncpy(header, auth, len);
-    header[len] = '\0';
-
-    return header;
-}
-
-/* ===== HANDLERS ===== */
+/* ===== ОБРАБОТЧИКИ ===== */
 void handle_predict(int client, char *body) {
 
     char result[1024];
@@ -97,7 +95,7 @@ void handle_batch(int client, char *body) {
     send_response(client, "200 OK", "application/json", result);
 }
 
-/* ===== MAIN ===== */
+/* ===== ОСНОВНОЙ ЦИКЛ СЕРВЕРА ===== */
 int main() {
 
     int server_fd, client_socket;
@@ -135,16 +133,14 @@ int main() {
         char method[8], path[64];
         sscanf(buffer, "%s %s", method, path);
 
+        /* Для POST тело начинается после пустой строки между заголовками и данными запроса. */
         char *body = strstr(buffer, "\r\n\r\n");
         if (body) body += 4;
 
-        char *auth_header = get_auth_header(buffer);
-        user_role_t role = get_role_from_token(auth_header);
-
-        /* ===== UI ===== */
+        /* ===== МАРШРУТ UI ===== */
         if (!strcmp(method, "GET") && !strcmp(path, "/")) {
 
-            char *html = read_file("index.html");
+            char *html = read_ui_file();
 
             if (!html) {
                 send_response(client_socket, "500 Internal Server Error", "text/plain", "UI not found");
@@ -154,44 +150,27 @@ int main() {
             }
         }
 
-        /* ===== ME ===== */
+        /* ===== МАРШРУТ /me ===== */
         else if (!strcmp(method, "GET") && !strcmp(path, "/me")) {
-
-            const char *role_str =
-                (role == ROLE_DOCTOR) ? "doctor" :
-                (role == ROLE_RESEARCHER) ? "researcher" :
-                (role == ROLE_ADMIN) ? "admin" :
-                "none";
-
             char resp[128];
-            snprintf(resp, sizeof(resp), "{ \"role\": \"%s\" }", role_str);
+            snprintf(resp, sizeof(resp), "{ \"role\": \"admin\" }");
 
             send_response(client_socket, "200 OK", "application/json", resp);
         }
 
-        /* ===== FAVICON ===== */
+        /* ===== МАРШРУТ /favicon.ico ===== */
         else if (!strcmp(method, "GET") && !strcmp(path, "/favicon.ico")) {
             send_response(client_socket, "204 No Content", "image/x-icon", "");
         }
 
-        /* ===== PREDICT ===== */
+        /* ===== МАРШРУТ /predict ===== */
         else if (!strcmp(method, "POST") && !strcmp(path, "/predict")) {
-
-            if (role != ROLE_DOCTOR && role != ROLE_ADMIN) {
-                send_response(client_socket, "403 Forbidden", "text/plain", "Access denied");
-            } else {
-                handle_predict(client_socket, body);
-            }
+            handle_predict(client_socket, body);
         }
 
-        /* ===== BATCH ===== */
+        /* ===== МАРШРУТ /batch ===== */
         else if (!strcmp(method, "POST") && !strcmp(path, "/batch")) {
-
-            if (role != ROLE_RESEARCHER && role != ROLE_ADMIN) {
-                send_response(client_socket, "403 Forbidden", "text/plain", "Access denied");
-            } else {
-                handle_batch(client_socket, body);
-            }
+            handle_batch(client_socket, body);
         }
 
         else {

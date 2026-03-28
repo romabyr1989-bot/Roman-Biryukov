@@ -1,26 +1,26 @@
 #ifndef PREDICT_H
 #define PREDICT_H
 
-/* ===== STATUS ===== */
+/* ===== КОДЫ СТАТУСА ===== */
 #define PARKINOME_OK 0
 #define PARKINOME_ERR_INVALID_INPUT 1
 #define PARKINOME_INVALID_RANGE 2
 #define PARKINOME_NAN_DETECTED 3
 #define PARKINOME_NULL_POINTER 4
 
-/* ===== INPUT ===== */
+/* ===== ВХОДНЫЕ ДАННЫЕ ===== */
 typedef struct {
 
-    /* clinical */
+    /* клинические */
     double age; int has_age;
     double updrs_iii; int has_updrs_iii;
     double scopa_aut; int has_scopa_aut;
     double hoehn_yahr; int has_hoehn_yahr;
 
-    /* cognitive */
+    /* когнитивные */
     double moca; int has_moca;
 
-    /* biomarkers */
+    /* биомаркеры */
     double ndufa4l2; int has_ndufa4l2;
     double ndufs2; int has_ndufs2;
     double pink1; int has_pink1;
@@ -33,7 +33,7 @@ typedef struct {
 } parkinome_input_t;
 
 
-/* ===== OUTPUT ===== */
+/* ===== ВЫХОДНЫЕ ДАННЫЕ ===== */
 typedef struct {
 
     double isp;
@@ -44,7 +44,7 @@ typedef struct {
 } parkinome_output_t;
 
 
-/* ===== API ===== */
+/* ===== ПУБЛИЧНЫЙ ИНТЕРФЕЙС ===== */
 int parkinome_predict(parkinome_input_t *in, parkinome_output_t *out);
 
 #endif

@@ -37,9 +37,12 @@ body {
 }
 
 .page {
-  max-width: 1150px;
-  margin: 0 auto;
-  padding: 22px 16px 28px;
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
 }
 
 .topbar {
@@ -92,6 +95,8 @@ select {
   display: grid;
   grid-template-columns: 1.1fr 0.9fr;
   gap: 14px;
+  flex: 1;
+  min-height: 0;
 }
 
 .panel {
@@ -101,6 +106,7 @@ select {
   backdrop-filter: blur(7px);
   padding: 16px;
   box-shadow: 0 10px 30px rgba(17, 34, 23, 0.08);
+  height: 100%;
 }
 
 .hidden { display: none !important; }
@@ -233,15 +239,6 @@ button {
   <div class="page">
     <div class="topbar">
       <div class="brand">Parkinome Console</div>
-      <div class="role-wrap">
-        <span style="font-size:13px;color:var(--muted)">Token</span>
-        <select id="token">
-          <option value="token_doctor">Doctor</option>
-          <option value="token_research">Researcher</option>
-          <option value="token_admin">Admin</option>
-        </select>
-        <span id="roleLabel" class="role-pill">NONE</span>
-      </div>
     </div>
 
     <div id="doctorUI" class="grid">
@@ -308,16 +305,11 @@ button {
       <div id="out" class="code">-</div>
     </section>
 
-    <section id="adminUI" class="panel hidden">
-      <h2>Admin</h2>
-      <p>Админ имеет доступ к обоим endpoint: <code>/predict</code> и <code>/batch</code>.</p>
-      <div class="notice" style="margin-top:10px">Текущая авторизация токеновая и демонстрационная. Для production лучше добавить полноценную проверку токенов и срок действия.</div>
-    </section>
   </div>
 
 <script>
 (() => {
-  let currentToken = "token_doctor";
+  let currentToken = "token_admin";
   const $ = (id) => document.getElementById(id);
 
   function n(v) {
@@ -329,22 +321,13 @@ button {
   function applyRole(role) {
     $("doctorUI").classList.add("hidden");
     $("researchUI").classList.add("hidden");
-    $("adminUI").classList.add("hidden");
 
     if (role === "doctor") $("doctorUI").classList.remove("hidden");
     if (role === "researcher") $("researchUI").classList.remove("hidden");
     if (role === "admin") {
       $("doctorUI").classList.remove("hidden");
       $("researchUI").classList.remove("hidden");
-      $("adminUI").classList.remove("hidden");
     }
-  }
-
-  function roleFromToken(token) {
-    if (token === "token_doctor") return "doctor";
-    if (token === "token_research") return "researcher";
-    if (token === "token_admin") return "admin";
-    return "none";
   }
 
   function showDoctorError(msg) {
@@ -354,6 +337,7 @@ button {
   }
 
   function buildDoctorPayload() {
+    // Отправляем только заполненные поля, чтобы сервер корректно определял доступные группы.
     const raw = {
       age: n($("age").value),
       updrs_iii: n($("updrs").value),
@@ -373,6 +357,7 @@ button {
   }
 
   function validatePayload(payload) {
+    // Клиентская валидация повторяет диапазоны сервера для быстрого отклика в интерфейсе.
     const checks = [
       ["age", 30, 90],
       ["updrs_iii", 0, 132],
@@ -414,9 +399,8 @@ button {
   }
 
   async function loadRole() {
-    currentToken = $("token").value;
-    const fallbackRole = roleFromToken(currentToken);
-    $("roleLabel").innerText = fallbackRole.toUpperCase();
+    // Интерфейс по умолчанию открывает полный доступ; /me может переопределить поведение.
+    const fallbackRole = "admin";
     applyRole(fallbackRole);
 
     try {
@@ -424,11 +408,10 @@ button {
       const data = await r.json();
       const role = data.role || "none";
       if (role !== "none") {
-        $("roleLabel").innerText = role.toUpperCase();
         applyRole(role);
       }
     } catch (_) {
-      /* keep fallback role from token */
+      /* Оставляем роль по умолчанию, если /me недоступен. */
     }
   }
 
@@ -484,7 +467,6 @@ button {
     }
   }
 
-  $("token")?.addEventListener("change", loadRole);
   $("btnPredict")?.addEventListener("click", predict);
   $("btnClear")?.addEventListener("click", clearDoctorForm);
   $("btnBatchRun")?.addEventListener("click", runBatch);

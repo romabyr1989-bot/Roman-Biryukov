@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-/* ===== READ FILE ===== */
+/* ===== ЧТЕНИЕ ФАЙЛА ===== */
 char* read_file(const char* filename) {
 
     FILE *f = fopen(filename, "rb");

@@ -5,13 +5,14 @@
 
 #include "predict.h"
 
-/* ===== PARSER ===== */
+/* ===== ПАРСЕР ===== */
 int parse_patient(cJSON *json, parkinome_input_t *in) {
 
     if (!json || !in) return PARKINOME_NULL_POINTER;
 
     memset(in, 0, sizeof(*in));
 
+    /* Копируем только поля, которые есть в JSON, и выставляем флаги has_* для модели. */
     #define SET_FIELD(name) { \
         cJSON *item = cJSON_GetObjectItem(json, #name); \
         if (item) { \
@@ -38,7 +39,8 @@ int parse_patient(cJSON *json, parkinome_input_t *in) {
     return PARKINOME_OK;
 }
 
-/* ===== SINGLE ===== */
+/* ===== ОДИН ПАЦИЕНТ ===== */
+/* Разбираем JSON одного пациента и формируем компактный JSON-ответ. */
 int run_prediction(const char *body, char *result, size_t size) {
 
     cJSON *json = cJSON_Parse(body);
@@ -74,7 +76,8 @@ int run_prediction(const char *body, char *result, size_t size) {
     return 0;
 }
 
-/* ===== BATCH ===== */
+/* ===== БАТЧ ===== */
+/* Обрабатываем массив: некорректные записи пропускаем, валидные добавляем в ответ. */
 int run_batch(const char *body, char *result, size_t size) {
 
     cJSON *array = cJSON_Parse(body);

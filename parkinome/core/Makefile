@@ -1,10 +1,12 @@
 CC := gcc
-CFLAGS := -Wall -Wextra -Wpedantic -std=c11 -O2
+CFLAGS := -Wall -Wextra -Wpedantic -std=c11 -O2 -Iinclude
 LDFLAGS := -lcjson -lm
 
 TARGET := parkinome_server
-SRCS := server.c auth.c predictor.c model.c json_io.c
-OBJS := $(SRCS:.c=.o)
+SRC_DIR := src
+BUILD_DIR := build
+SRCS := $(SRC_DIR)/server.c $(SRC_DIR)/predictor.c $(SRC_DIR)/model.c $(SRC_DIR)/json_io.c
+OBJS := $(SRCS:$(SRC_DIR)/%.c=$(BUILD_DIR)/%.o)
 
 .PHONY: all run clean
 
@@ -13,7 +15,8 @@ all: $(TARGET)
 $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $(OBJS) $(LDFLAGS)
 
-%.o: %.c
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
+	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 run: $(TARGET)

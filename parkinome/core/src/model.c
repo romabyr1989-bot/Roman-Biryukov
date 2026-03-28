@@ -1,19 +1,20 @@
 #include <math.h>
 #include "predict.h"
 
-/* ===== GROUP WEIGHTS ===== */
+/* ===== ВЕСА ГРУПП ===== */
 #define W_CLINICAL   0.3
 #define W_COGNITIVE  0.2
 #define W_BIOMARKER  0.5
 
-/* ===== NORMALIZATION ===== */
+/* ===== НОРМАЛИЗАЦИЯ ===== */
+/* Ограничиваем значения диапазоном и переводим в шкалу 0..1. */
 double normalize(double x, double min, double max) {
     if (x < min) x = min;
     if (x > max) x = max;
     return (x - min) / (max - min);
 }
 
-/* ===== CLINICAL ===== */
+/* ===== КЛИНИЧЕСКАЯ ГРУППА ===== */
 double calc_clinical(parkinome_input_t *in, int *used) {
 
     double sum = 0;
@@ -43,12 +44,12 @@ double calc_clinical(parkinome_input_t *in, int *used) {
     return (count > 0) ? sum / count : 0;
 }
 
-/* ===== COGNITIVE ===== */
+/* ===== КОГНИТИВНАЯ ГРУППА ===== */
 double calc_cognitive(parkinome_input_t *in, int *used) {
 
     if (in->has_moca) {
         *used = 1;
-        /* ниже MOCA → выше риск */
+        /* Чем ниже результат MOCA, тем выше риск. */
         return 1.0 - normalize(in->moca, 0, 30);
     }
 
@@ -56,7 +57,7 @@ double calc_cognitive(parkinome_input_t *in, int *used) {
     return 0;
 }
 
-/* ===== BIOMARKERS ===== */
+/* ===== БИОМАРКЕРЫ ===== */
 double calc_biomarkers(parkinome_input_t *in, int *used) {
 
     double sum = 0;
@@ -75,7 +76,8 @@ double calc_biomarkers(parkinome_input_t *in, int *used) {
     return (count > 0) ? sum / count : 0;
 }
 
-/* ===== MAIN MODEL ===== */
+/* ===== ОСНОВНАЯ МОДЕЛЬ ===== */
+/* Комбинируем только доступные группы: отсутствие группы не штрафует итоговый балл. */
 int parkinome_predict(parkinome_input_t *in, parkinome_output_t *out) {
 
     if (!in || !out) return PARKINOME_NULL_POINTER;
@@ -91,7 +93,7 @@ int parkinome_predict(parkinome_input_t *in, parkinome_output_t *out) {
     double total_score = 0;
     double total_weight = 0;
 
-    /* combine groups */
+    /* Комбинируем группы с учетом весов. */
     if (use_clinical) {
         total_score += clinical * W_CLINICAL;
         total_weight += W_CLINICAL;
@@ -112,13 +114,14 @@ int parkinome_predict(parkinome_input_t *in, parkinome_output_t *out) {
         return PARKINOME_ERR_INVALID_INPUT;
     }
 
+    /* Итоговый риск — взвешенное среднее только по реально присутствующим группам. */
     double risk = total_score / total_weight;
 
-    /* ===== OUTPUT ===== */
+    /* ===== ВЫХОД ===== */
     out->risk_probability = risk;
     out->isp = risk;
 
-    /* category */
+    /* Категория риска. */
     if (risk < 0.33)
         out->category = 0;
     else if (risk < 0.66)
@@ -126,7 +129,7 @@ int parkinome_predict(parkinome_input_t *in, parkinome_output_t *out) {
     else
         out->category = 2;
 
-    /* confidence = доля использованных групп */
+    /* Уверенность = доля использованных групп в итоговом расчёте. */
     out->confidence = total_weight;
 
     return PARKINOME_OK;
