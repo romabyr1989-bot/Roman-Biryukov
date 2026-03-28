@@ -12,28 +12,52 @@
 #define PORT 8080
 #define BUFFER_SIZE 8192
 
+static int write_all(int fd, const char *data, size_t len) {
+    size_t sent = 0;
+    while (sent < len) {
+        ssize_t n = write(fd, data + sent, len - sent);
+        if (n <= 0) return -1;
+        sent += (size_t)n;
+    }
+    return 0;
+}
+
 /* ===== RESPONSE ===== */
 void send_response(int client, const char *status, const char *type, const char *body) {
 
-    char response[BUFFER_SIZE];
-
-    snprintf(response, sizeof(response),
+    size_t body_len = strlen(body);
+    int header_len = snprintf(NULL, 0,
         "HTTP/1.1 %s\r\n"
         "Content-Type: %s\r\n"
-        "Content-Length: %lu\r\n\r\n%s",
-        status,
-        type,
-        strlen(body),
-        body
+        "Content-Length: %zu\r\n\r\n",
+        status, type, body_len
     );
 
-    write(client, response, strlen(response));
+    if (header_len < 0) return;
+
+    size_t total_len = (size_t)header_len + body_len;
+    char *response = malloc(total_len + 1);
+    if (!response) return;
+
+    snprintf(response, (size_t)header_len + 1,
+        "HTTP/1.1 %s\r\n"
+        "Content-Type: %s\r\n"
+        "Content-Length: %zu\r\n\r\n",
+        status, type, body_len
+    );
+
+    memcpy(response + header_len, body, body_len);
+    response[total_len] = '\0';
+
+    write_all(client, response, total_len);
+    free(response);
 }
 
 /* ===== AUTH HEADER ===== */
 char* get_auth_header(char *request) {
 
     char *auth = strstr(request, "Authorization:");
+    if (!auth) auth = strstr(request, "authorization:");
     if (!auth) return NULL;
 
     char *end = strstr(auth, "\r\n");
@@ -143,6 +167,11 @@ int main() {
             snprintf(resp, sizeof(resp), "{ \"role\": \"%s\" }", role_str);
 
             send_response(client_socket, "200 OK", "application/json", resp);
+        }
+
+        /* ===== FAVICON ===== */
+        else if (!strcmp(method, "GET") && !strcmp(path, "/favicon.ico")) {
+            send_response(client_socket, "204 No Content", "image/x-icon", "");
         }
 
         /* ===== PREDICT ===== */

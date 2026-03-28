@@ -235,7 +235,7 @@ button {
       <div class="brand">Parkinome Console</div>
       <div class="role-wrap">
         <span style="font-size:13px;color:var(--muted)">Token</span>
-        <select id="token" onchange="loadRole()">
+        <select id="token">
           <option value="token_doctor">Doctor</option>
           <option value="token_research">Researcher</option>
           <option value="token_admin">Admin</option>
@@ -250,24 +250,24 @@ button {
         <p>Заполни любое количество полей. Модель сама учтёт доступные группы признаков.</p>
 
         <div class="form-grid">
-          <div class="field"><label>Age</label><input id="age" type="number" placeholder="e.g. 67"></div>
-          <div class="field"><label>UPDRS III</label><input id="updrs" type="number" placeholder="e.g. 38"></div>
-          <div class="field"><label>MOCA</label><input id="moca" type="number" placeholder="e.g. 22"></div>
-          <div class="field"><label>SCOPA AUT</label><input id="scopa" type="number" placeholder="e.g. 24"></div>
-          <div class="field"><label>Hoehn-Yahr</label><input id="hy" type="number" step="0.1" placeholder="e.g. 2.5"></div>
-          <div class="field"><label>NDUFA4L2</label><input id="ndufa4l2" type="number" step="0.01" placeholder="e.g. 4.1"></div>
-          <div class="field"><label>NDUFS2</label><input id="ndufs2" type="number" step="0.01" placeholder="e.g. 3.8"></div>
-          <div class="field"><label>PINK1</label><input id="pink1" type="number" step="0.01" placeholder="e.g. 2.2"></div>
-          <div class="field"><label>PPARGC1A</label><input id="ppargc1a" type="number" step="0.01" placeholder="e.g. 3.4"></div>
-          <div class="field"><label>NLRP3</label><input id="nlrp3" type="number" step="0.01" placeholder="e.g. 6.1"></div>
-          <div class="field"><label>IL1B</label><input id="il1b" type="number" step="0.01" placeholder="e.g. 5.2"></div>
-          <div class="field"><label>S100A8</label><input id="s100a8" type="number" step="0.01" placeholder="e.g. 4.9"></div>
-          <div class="field"><label>CXCL8</label><input id="cxcl8" type="number" step="0.01" placeholder="e.g. 5.6"></div>
+          <div class="field"><label>Age (30-90)</label><input id="age" type="number" min="30" max="90" step="1" placeholder="e.g. 67"></div>
+          <div class="field"><label>UPDRS III (0-132)</label><input id="updrs" type="number" min="0" max="132" step="1" placeholder="e.g. 38"></div>
+          <div class="field"><label>MOCA (0-30)</label><input id="moca" type="number" min="0" max="30" step="1" placeholder="e.g. 22"></div>
+          <div class="field"><label>SCOPA AUT (0-69)</label><input id="scopa" type="number" min="0" max="69" step="1" placeholder="e.g. 24"></div>
+          <div class="field"><label>Hoehn-Yahr (1-5)</label><input id="hy" type="number" min="1" max="5" step="0.1" placeholder="e.g. 2.5"></div>
+          <div class="field"><label>NDUFA4L2 (-10..10)</label><input id="ndufa4l2" type="number" min="-10" max="10" step="0.01" placeholder="e.g. 4.1"></div>
+          <div class="field"><label>NDUFS2 (-10..10)</label><input id="ndufs2" type="number" min="-10" max="10" step="0.01" placeholder="e.g. 3.8"></div>
+          <div class="field"><label>PINK1 (-10..10)</label><input id="pink1" type="number" min="-10" max="10" step="0.01" placeholder="e.g. 2.2"></div>
+          <div class="field"><label>PPARGC1A (-10..10)</label><input id="ppargc1a" type="number" min="-10" max="10" step="0.01" placeholder="e.g. 3.4"></div>
+          <div class="field"><label>NLRP3 (-10..10)</label><input id="nlrp3" type="number" min="-10" max="10" step="0.01" placeholder="e.g. 6.1"></div>
+          <div class="field"><label>IL1B (-10..10)</label><input id="il1b" type="number" min="-10" max="10" step="0.01" placeholder="e.g. 5.2"></div>
+          <div class="field"><label>S100A8 (-10..10)</label><input id="s100a8" type="number" min="-10" max="10" step="0.01" placeholder="e.g. 4.9"></div>
+          <div class="field"><label>CXCL8 (-10..10)</label><input id="cxcl8" type="number" min="-10" max="10" step="0.01" placeholder="e.g. 5.6"></div>
         </div>
 
         <div class="actions">
-          <button class="btn-primary" onclick="predict()">Run Prediction</button>
-          <button class="btn-ghost" onclick="clearDoctorForm()">Clear</button>
+          <button id="btnPredict" type="button" class="btn-primary">Run Prediction</button>
+          <button id="btnClear" type="button" class="btn-ghost">Clear</button>
         </div>
       </section>
 
@@ -299,8 +299,8 @@ button {
       <h2>Batch Mode</h2>
       <p>Вставь JSON-массив пациентов и запусти массовый расчёт.</p>
       <div class="actions">
-        <button class="btn-primary" onclick="runBatch()">Run Batch</button>
-        <button class="btn-ghost" onclick="setBatchExample()">Insert Example</button>
+        <button id="btnBatchRun" type="button" class="btn-primary">Run Batch</button>
+        <button id="btnBatchExample" type="button" class="btn-ghost">Insert Example</button>
       </div>
       <div style="margin-top:10px">
         <textarea id="batch" placeholder='[{"age":65,"updrs_iii":31},{"age":71,"moca":20,"nlrp3":7.2}]'></textarea>
@@ -316,139 +316,182 @@ button {
   </div>
 
 <script>
-let currentToken = "token_doctor";
+(() => {
+  let currentToken = "token_doctor";
+  const $ = (id) => document.getElementById(id);
 
-function n(v) {
-  if (v === '' || v === null || v === undefined) return undefined;
-  const x = Number(v);
-  return Number.isFinite(x) ? x : undefined;
-}
-
-function loadRole() {
-  currentToken = token.value;
-  fetch('/me', { headers: { Authorization: 'Bearer ' + currentToken } })
-    .then(r => r.json())
-    .then(data => {
-      const role = data.role || 'none';
-      roleLabel.innerText = role.toUpperCase();
-      applyRole(role);
-    })
-    .catch(() => {
-      roleLabel.innerText = 'NONE';
-      applyRole('none');
-    });
-}
-
-function applyRole(role) {
-  doctorUI.classList.add('hidden');
-  researchUI.classList.add('hidden');
-  adminUI.classList.add('hidden');
-
-  if (role === 'doctor') doctorUI.classList.remove('hidden');
-  if (role === 'researcher') researchUI.classList.remove('hidden');
-  if (role === 'admin') {
-    doctorUI.classList.remove('hidden');
-    researchUI.classList.remove('hidden');
-    adminUI.classList.remove('hidden');
+  function n(v) {
+    if (v === '' || v === null || v === undefined) return undefined;
+    const x = Number(v);
+    return Number.isFinite(x) ? x : undefined;
   }
-}
 
-function clearDoctorForm() {
-  [age, updrs, moca, scopa, hy, ndufa4l2, ndufs2, pink1, ppargc1a, nlrp3, il1b, s100a8, cxcl8].forEach(i => i.value = '');
-  risk.innerText = '-';
-  category.innerText = '-';
-  confidence.innerText = '-';
-  isp.innerText = '-';
-  doctorError.classList.add('hidden');
-}
+  function applyRole(role) {
+    $("doctorUI").classList.add("hidden");
+    $("researchUI").classList.add("hidden");
+    $("adminUI").classList.add("hidden");
 
-function buildDoctorPayload() {
-  const raw = {
-    age: n(age.value),
-    updrs_iii: n(updrs.value),
-    moca: n(moca.value),
-    scopa_aut: n(scopa.value),
-    hoehn_yahr: n(hy.value),
-    ndufa4l2: n(ndufa4l2.value),
-    ndufs2: n(ndufs2.value),
-    pink1: n(pink1.value),
-    ppargc1a: n(ppargc1a.value),
-    nlrp3: n(nlrp3.value),
-    il1b: n(il1b.value),
-    s100a8: n(s100a8.value),
-    cxcl8: n(cxcl8.value)
-  };
+    if (role === "doctor") $("doctorUI").classList.remove("hidden");
+    if (role === "researcher") $("researchUI").classList.remove("hidden");
+    if (role === "admin") {
+      $("doctorUI").classList.remove("hidden");
+      $("researchUI").classList.remove("hidden");
+      $("adminUI").classList.remove("hidden");
+    }
+  }
 
-  return Object.fromEntries(
-    Object.entries(raw).filter(([, value]) => value !== undefined)
-  );
-}
+  function roleFromToken(token) {
+    if (token === "token_doctor") return "doctor";
+    if (token === "token_research") return "researcher";
+    if (token === "token_admin") return "admin";
+    return "none";
+  }
 
-function classByRisk(v) {
-  if (v < 0.33) return 'low';
-  if (v < 0.66) return 'mid';
-  return 'high';
-}
+  function showDoctorError(msg) {
+    const e = $("doctorError");
+    e.innerText = msg;
+    e.classList.remove("hidden");
+  }
 
-function showDoctorError(msg) {
-  doctorError.innerText = msg;
-  doctorError.classList.remove('hidden');
-}
+  function buildDoctorPayload() {
+    const raw = {
+      age: n($("age").value),
+      updrs_iii: n($("updrs").value),
+      moca: n($("moca").value),
+      scopa_aut: n($("scopa").value),
+      hoehn_yahr: n($("hy").value),
+      ndufa4l2: n($("ndufa4l2").value),
+      ndufs2: n($("ndufs2").value),
+      pink1: n($("pink1").value),
+      ppargc1a: n($("ppargc1a").value),
+      nlrp3: n($("nlrp3").value),
+      il1b: n($("il1b").value),
+      s100a8: n($("s100a8").value),
+      cxcl8: n($("cxcl8").value)
+    };
+    return Object.fromEntries(Object.entries(raw).filter(([, v]) => v !== undefined));
+  }
 
-function predict() {
-  doctorError.classList.add('hidden');
-  fetch('/predict', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: 'Bearer ' + currentToken
-    },
-    body: JSON.stringify(buildDoctorPayload())
-  })
-    .then(async r => {
+  function validatePayload(payload) {
+    const checks = [
+      ["age", 30, 90],
+      ["updrs_iii", 0, 132],
+      ["moca", 0, 30],
+      ["scopa_aut", 0, 69],
+      ["hoehn_yahr", 1, 5],
+      ["ndufa4l2", -10, 10],
+      ["ndufs2", -10, 10],
+      ["pink1", -10, 10],
+      ["ppargc1a", -10, 10],
+      ["nlrp3", -10, 10],
+      ["il1b", -10, 10],
+      ["s100a8", -10, 10],
+      ["cxcl8", -10, 10]
+    ];
+
+    for (const [key, min, max] of checks) {
+      if (payload[key] === undefined) continue;
+      if (payload[key] < min || payload[key] > max) {
+        throw new Error(`${key} must be in range [${min}, ${max}]`);
+      }
+    }
+  }
+
+  function classByRisk(v) {
+    if (v < 0.33) return "low";
+    if (v < 0.66) return "mid";
+    return "high";
+  }
+
+  function clearDoctorForm() {
+    ["age","updrs","moca","scopa","hy","ndufa4l2","ndufs2","pink1","ppargc1a","nlrp3","il1b","s100a8","cxcl8"]
+      .forEach((id) => { $(id).value = ""; });
+    $("risk").innerText = "-";
+    $("category").innerText = "-";
+    $("confidence").innerText = "-";
+    $("isp").innerText = "-";
+    $("doctorError").classList.add("hidden");
+  }
+
+  async function loadRole() {
+    currentToken = $("token").value;
+    const fallbackRole = roleFromToken(currentToken);
+    $("roleLabel").innerText = fallbackRole.toUpperCase();
+    applyRole(fallbackRole);
+
+    try {
+      const r = await fetch("/me", { headers: { Authorization: "Bearer " + currentToken } });
+      const data = await r.json();
+      const role = data.role || "none";
+      if (role !== "none") {
+        $("roleLabel").innerText = role.toUpperCase();
+        applyRole(role);
+      }
+    } catch (_) {
+      /* keep fallback role from token */
+    }
+  }
+
+  async function predict() {
+    $("doctorError").classList.add("hidden");
+    try {
+      const payload = buildDoctorPayload();
+      if (Object.keys(payload).length === 0) {
+        throw new Error("Fill at least one input field before prediction.");
+      }
+      validatePayload(payload);
+
+      const r = await fetch("/predict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + currentToken },
+        body: JSON.stringify(payload)
+      });
       const txt = await r.text();
-      if (!r.ok) throw new Error(txt || ('HTTP ' + r.status));
-      return JSON.parse(txt);
-    })
-    .then(res => {
+      if (!r.ok) throw new Error(txt || ("HTTP " + r.status));
+      const res = JSON.parse(txt);
+
       const rp = Number(res.risk_probability);
-      risk.className = 'v ' + classByRisk(rp);
-      category.className = 'v ' + classByRisk(rp);
+      $("risk").className = "v " + classByRisk(rp);
+      $("category").className = "v " + classByRisk(rp);
+      $("risk").innerText = Number.isFinite(rp) ? (rp * 100).toFixed(1) + "%" : "-";
+      $("category").innerText = res.category || "-";
+      $("confidence").innerText = typeof res.confidence === "number" ? res.confidence.toFixed(2) : "-";
+      $("isp").innerText = typeof res.isp === "number" ? res.isp.toFixed(3) : "-";
+    } catch (err) {
+      showDoctorError("Prediction failed: " + err.message);
+    }
+  }
 
-      risk.innerText = Number.isFinite(rp) ? (rp * 100).toFixed(1) + '%' : '-';
-      category.innerText = res.category || '-';
-      confidence.innerText = typeof res.confidence === 'number' ? res.confidence.toFixed(2) : '-';
-      isp.innerText = typeof res.isp === 'number' ? res.isp.toFixed(3) : '-';
-    })
-    .catch(err => showDoctorError('Prediction failed: ' + err.message));
-}
+  function setBatchExample() {
+    $("batch").value = JSON.stringify([
+      { age: 65, updrs_iii: 31, moca: 23, hoehn_yahr: 2 },
+      { age: 71, updrs_iii: 48, nlrp3: 7.2, il1b: 6.4, cxcl8: 6.8 }
+    ], null, 2);
+  }
 
-function setBatchExample() {
-  batch.value = JSON.stringify([
-    { age: 65, updrs_iii: 31, moca: 23, hoehn_yahr: 2 },
-    { age: 71, updrs_iii: 48, nlrp3: 7.2, il1b: 6.4, cxcl8: 6.8 }
-  ], null, 2);
-}
-
-function runBatch() {
-  fetch('/batch', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: 'Bearer ' + currentToken
-    },
-    body: batch.value
-  })
-    .then(async r => {
+  async function runBatch() {
+    try {
+      const r = await fetch("/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + currentToken },
+        body: $("batch").value
+      });
       const txt = await r.text();
-      if (!r.ok) throw new Error(txt || ('HTTP ' + r.status));
-      return txt;
-    })
-    .then(txt => { out.innerText = txt; })
-    .catch(err => { out.innerText = 'Batch failed: ' + err.message; });
-}
+      if (!r.ok) throw new Error(txt || ("HTTP " + r.status));
+      $("out").innerText = txt;
+    } catch (err) {
+      $("out").innerText = "Batch failed: " + err.message;
+    }
+  }
 
-loadRole();
+  $("token")?.addEventListener("change", loadRole);
+  $("btnPredict")?.addEventListener("click", predict);
+  $("btnClear")?.addEventListener("click", clearDoctorForm);
+  $("btnBatchRun")?.addEventListener("click", runBatch);
+  $("btnBatchExample")?.addEventListener("click", setBatchExample);
+
+  loadRole();
+})();
 </script>
 </body>
 </html>
