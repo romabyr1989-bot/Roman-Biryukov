@@ -4,16 +4,17 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 
-#include "predictor.h"
-#include "json_io.h"
-#include "logger.h"
-#include "storage_sqlite.h"
+#include "predict.h"
 #include "auth.h"
+#include "json_io.h"   // ✅ используем read_file отсюда
+
+int run_prediction(const char *body, char *result, size_t size);
+int run_batch(const char *body, char *result, size_t size);
 
 #define PORT 8080
 #define BUFFER_SIZE 8192
 
-/* ===== HTTP ===== */
+/* ===== RESPONSE ===== */
 void send_response(int client, const char *status, const char *type, const char *body) {
 
     char response[BUFFER_SIZE];
@@ -22,161 +23,56 @@ void send_response(int client, const char *status, const char *type, const char 
         "HTTP/1.1 %s\r\n"
         "Content-Type: %s\r\n"
         "Content-Length: %lu\r\n\r\n%s",
-        status, type, strlen(body), body
+        status,
+        type,
+        strlen(body),
+        body
     );
 
     write(client, response, strlen(response));
 }
 
-/* ===== STATIC ===== */
-void handle_static(int client, const char *path) {
+/* ===== AUTH HEADER ===== */
+char* get_auth_header(char *request) {
 
-    char fullpath[256];
-    snprintf(fullpath, sizeof(fullpath), "web%s", path);
+    char *auth = strstr(request, "Authorization:");
+    if (!auth) return NULL;
 
-    char *content = read_file(fullpath);
+    char *end = strstr(auth, "\r\n");
+    if (!end) return NULL;
 
-    if (!content) {
-        log_error("Static file not found");
-        send_response(client, "404 Not Found", "text/plain", "File not found");
-        return;
-    }
+    static char header[256];
+    int len = end - auth;
 
-    const char *type =
-        strstr(path, ".css") ? "text/css" :
-        strstr(path, ".js") ? "application/javascript" :
-        strstr(path, ".html") ? "text/html" :
-        "text/plain";
+    strncpy(header, auth, len);
+    header[len] = '\0';
 
-    send_response(client, "200 OK", type, content);
-    free(content);
+    return header;
 }
 
-/* ===== UI ===== */
-void handle_form(int client) {
-
-    char *html = read_file("web/index.html");
-
-    if (!html) {
-        log_error("UI not found");
-        send_response(client, "500 Internal Server Error", "text/plain", "UI not found");
-        return;
-    }
-
-    send_response(client, "200 OK", "text/html", html);
-    free(html);
-}
-
-/* ===== HEALTH ===== */
-void handle_health(int client) {
-    send_response(client, "200 OK", "text/plain", "Parkinome API is running");
-}
-
-/* ===== LOGIN ===== */
-void handle_login(int client, char *body) {
-
-    if (!body) {
-        send_response(client, "400 Bad Request", "text/plain", "No body");
-        return;
-    }
-
-    const char *token = auth_login(body);
-
-    if (!token) {
-        send_response(client, "401 Unauthorized", "text/plain", "Invalid login");
-        return;
-    }
-
-    char response[128];
-    snprintf(response, sizeof(response), "{ \"token\": \"%s\" }", token);
-
-    send_response(client, "200 OK", "application/json", response);
-}
-
-/* ===== PREDICT ===== */
+/* ===== HANDLERS ===== */
 void handle_predict(int client, char *body) {
 
-    if (!body) {
-        log_error("Predict: no body");
-        send_response(client, "400 Bad Request", "text/plain", "No body");
-        return;
-    }
+    char result[1024];
 
-    char result[512];
-
-    if (run_prediction(body, result, sizeof(result)) != 0) {
-        log_error("Prediction failed");
-        send_response(client, "400 Bad Request", "text/plain", "Prediction error");
+    if (!body || run_prediction(body, result, sizeof(result)) != 0) {
+        send_response(client, "400 Bad Request", "text/plain", "Error");
         return;
     }
 
     send_response(client, "200 OK", "application/json", result);
 }
 
-/* ===== BATCH ===== */
-void handle_batch(int client, char *body, const char *role) {
-
-    if (strcmp(role, "pharma") != 0) {
-        send_response(client, "403 Forbidden", "text/plain", "Access denied");
-        return;
-    }
-
-    if (!body) {
-        log_error("Batch: no body");
-        send_response(client, "400 Bad Request", "text/plain", "No body");
-        return;
-    }
+void handle_batch(int client, char *body) {
 
     char result[4096];
 
-    if (run_batch(body, result, sizeof(result)) != 0) {
-        log_error("Batch failed");
-        send_response(client, "400 Bad Request", "text/plain", "Batch error");
+    if (!body || run_batch(body, result, sizeof(result)) != 0) {
+        send_response(client, "400 Bad Request", "text/plain", "Error");
         return;
     }
 
     send_response(client, "200 OK", "application/json", result);
-}
-
-/* ===== STORAGE ===== */
-void handle_save(int client, char *body, const char *role) {
-
-    if (strcmp(role, "doctor") != 0) {
-        send_response(client, "403 Forbidden", "text/plain", "Access denied");
-        return;
-    }
-
-    if (!body) {
-        log_error("Save: no body");
-        send_response(client, "400 Bad Request", "text/plain", "No body");
-        return;
-    }
-
-    if (db_save_patient(body) != 0) {
-        log_error("DB save failed");
-        send_response(client, "500 Internal Server Error", "text/plain", "Save failed");
-        return;
-    }
-
-    send_response(client, "200 OK", "text/plain", "Saved");
-}
-
-void handle_get_patients(int client, const char *role) {
-
-    if (strcmp(role, "doctor") != 0) {
-        send_response(client, "403 Forbidden", "text/plain", "Access denied");
-        return;
-    }
-
-    char *data = db_get_patients();
-
-    if (!data) {
-        send_response(client, "200 OK", "application/json", "[]");
-        return;
-    }
-
-    send_response(client, "200 OK", "application/json", data);
-    free(data);
 }
 
 /* ===== MAIN ===== */
@@ -187,8 +83,6 @@ int main() {
     int addrlen = sizeof(address);
 
     char buffer[BUFFER_SIZE];
-
-    db_init();
 
     server_fd = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -208,6 +102,7 @@ int main() {
                                (socklen_t*)&addrlen);
 
         int valread = read(client_socket, buffer, sizeof(buffer) - 1);
+
         if (valread <= 0) {
             close(client_socket);
             continue;
@@ -215,63 +110,64 @@ int main() {
 
         buffer[valread] = '\0';
 
-        char method[8], path[256];
+        char method[8], path[64];
         sscanf(buffer, "%s %s", method, path);
-
-        /* ===== TOKEN ===== */
-        char *auth = strstr(buffer, "Authorization: Bearer ");
-        const char *role = "unknown";
-
-        if (auth) {
-            auth += strlen("Authorization: Bearer ");
-            char *end = strstr(auth, "\r\n");
-
-            char token[64];
-            strncpy(token, auth, end - auth);
-            token[end - auth] = '\0';
-
-            role = auth_get_role(token);
-        }
-
-        /* ===== LOG ===== */
-        char log_msg[256];
-        snprintf(log_msg, sizeof(log_msg), "%s %s [%s]", method, path, role);
-        log_info(log_msg);
 
         char *body = strstr(buffer, "\r\n\r\n");
         if (body) body += 4;
 
-        /* ===== ROUTES ===== */
+        char *auth_header = get_auth_header(buffer);
+        user_role_t role = get_role_from_token(auth_header);
 
+        /* ===== UI ===== */
         if (!strcmp(method, "GET") && !strcmp(path, "/")) {
-            handle_form(client_socket);
+
+            char *html = read_file("index.html");
+
+            if (!html) {
+                send_response(client_socket, "500 Internal Server Error", "text/plain", "UI not found");
+            } else {
+                send_response(client_socket, "200 OK", "text/html", html);
+                free(html);
+            }
         }
-        else if (!strcmp(method, "GET") && !strcmp(path, "/health")) {
-            handle_health(client_socket);
+
+        /* ===== ME ===== */
+        else if (!strcmp(method, "GET") && !strcmp(path, "/me")) {
+
+            const char *role_str =
+                (role == ROLE_DOCTOR) ? "doctor" :
+                (role == ROLE_RESEARCHER) ? "researcher" :
+                (role == ROLE_ADMIN) ? "admin" :
+                "none";
+
+            char resp[128];
+            snprintf(resp, sizeof(resp), "{ \"role\": \"%s\" }", role_str);
+
+            send_response(client_socket, "200 OK", "application/json", resp);
         }
-        else if (!strcmp(method, "GET") && strstr(path, ".css")) {
-            handle_static(client_socket, path);
-        }
-        else if (!strcmp(method, "GET") && strstr(path, ".js")) {
-            handle_static(client_socket, path);
-        }
-        else if (!strcmp(method, "POST") && !strcmp(path, "/login")) {
-            handle_login(client_socket, body);
-        }
+
+        /* ===== PREDICT ===== */
         else if (!strcmp(method, "POST") && !strcmp(path, "/predict")) {
-            handle_predict(client_socket, body);
+
+            if (role != ROLE_DOCTOR && role != ROLE_ADMIN) {
+                send_response(client_socket, "403 Forbidden", "text/plain", "Access denied");
+            } else {
+                handle_predict(client_socket, body);
+            }
         }
+
+        /* ===== BATCH ===== */
         else if (!strcmp(method, "POST") && !strcmp(path, "/batch")) {
-            handle_batch(client_socket, body, role);
+
+            if (role != ROLE_RESEARCHER && role != ROLE_ADMIN) {
+                send_response(client_socket, "403 Forbidden", "text/plain", "Access denied");
+            } else {
+                handle_batch(client_socket, body);
+            }
         }
-        else if (!strcmp(method, "POST") && !strcmp(path, "/patient")) {
-            handle_save(client_socket, body, role);
-        }
-        else if (!strcmp(method, "GET") && !strcmp(path, "/patients")) {
-            handle_get_patients(client_socket, role);
-        }
+
         else {
-            log_error("Route not found");
             send_response(client_socket, "404 Not Found", "text/plain", "Not Found");
         }
 
