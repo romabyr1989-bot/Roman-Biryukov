@@ -5,11 +5,9 @@
 #include <arpa/inet.h>
 
 #include "predict.h"
+#include "predictor.h"
 #include "auth.h"
 #include "json_io.h"   // ✅ используем read_file отсюда
-
-int run_prediction(const char *body, char *result, size_t size);
-int run_batch(const char *body, char *result, size_t size);
 
 #define PORT 8080
 #define BUFFER_SIZE 8192

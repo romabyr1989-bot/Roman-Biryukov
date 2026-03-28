@@ -1,3 +1,4 @@
 parkinome_server
 *.o
+*.save
 .DS_Store
