@@ -13,7 +13,7 @@
 ## Active Runtime Modules
 
 - `src/server.c`: HTTP server and route handling.
-- `src/predictor.c` + `include/predictor.h`: JSON parsing (`cJSON`), single and batch prediction adapters.
+- `src/predictor.c` + `include/predictor.h`: unified JSON parsing (`cJSON`) and prediction adapter.
 - `src/model.c` + `include/predict.h`: risk model and prediction API.
 - `src/json_io.c` + `include/json_io.h`: file read utility for serving `web/index.html`.
 
@@ -33,7 +33,7 @@ These files are preserved for reference and possible future reintegration, but a
 ## Request Flow
 
 1. Client sends HTTP request to `src/server.c`.
-2. `src/server.c` dispatches route (`/`, `/predict`, `/batch`, `/me`).
+2. `src/server.c` dispatches route (`/`, `/predict`, `/me`, `/save`, `/history`).
 3. `src/predictor.c` parses request JSON and calls `parkinome_predict(...)`.
 4. `src/model.c` computes risk outputs.
 5. `src/server.c` returns JSON or HTML response.

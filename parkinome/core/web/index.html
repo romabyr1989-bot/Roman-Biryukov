@@ -4,23 +4,20 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Parkinome Console</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg-1: #f3f1ea;
-  --bg-2: #d9e4dd;
-  --panel: rgba(255, 255, 255, 0.78);
-  --panel-strong: rgba(255, 255, 255, 0.92);
-  --text: #112217;
-  --muted: #4f5f54;
-  --line: #cad5cd;
-  --accent: #0f6b4a;
-  --accent-soft: #e2f2eb;
-  --warn: #b36a09;
-  --high: #a22f2f;
-  --ok: #1e7a3f;
+  --bg: #f5f5f7;
+  --panel: #ffffff;
+  --panel-strong: #ffffff;
+  --text: #1d1d1f;
+  --muted: #86868b;
+  --line: #d2d2d7;
+  --accent: #0071e3;
+  --accent-hover: #0077ed;
+  --soft-shadow: 0 8px 28px rgba(0, 0, 0, 0.06);
+  --warn: #b47f00;
+  --high: #cc1f1f;
+  --ok: #2f7b22;
 }
 
 * { box-sizing: border-box; }
@@ -28,36 +25,46 @@
 body {
   margin: 0;
   min-height: 100vh;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif;
   color: var(--text);
-  background:
-    radial-gradient(circle at 12% 18%, #ffffffb8 0%, transparent 42%),
-    radial-gradient(circle at 88% 82%, #eef8f1 0%, transparent 50%),
-    linear-gradient(135deg, var(--bg-1), var(--bg-2));
+  background: var(--bg);
 }
 
 .page {
   width: 100%;
-  min-height: 100vh;
+  max-width: none;
+  min-height: auto;
   margin: 0;
-  padding: 16px;
+  padding: 8px 12px 14px;
   display: flex;
   flex-direction: column;
+  gap: 6px;
 }
 
 .topbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 14px;
+  position: relative;
+  padding: 8px 8px 6px;
+  text-align: center;
+  border-bottom: 1px solid #e5e5ea;
 }
 
 .brand {
-  font-size: clamp(22px, 4.5vw, 34px);
+  font-size: clamp(24px, 2.8vw, 40px);
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: -0.04em;
+  line-height: 1.02;
+}
+
+.hero-sub {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: clamp(14px, 1.4vw, 17px);
+  letter-spacing: -0.02em;
+}
+
+#doctorUI.actions {
+  margin-top: 2px !important;
+  margin-bottom: 6px !important;
 }
 
 .role-wrap {
@@ -100,20 +107,20 @@ select {
 }
 
 .panel {
-  border: 1px solid var(--line);
-  border-radius: 18px;
+  border: 1px solid #e5e5ea;
+  border-radius: 24px;
   background: var(--panel);
-  backdrop-filter: blur(7px);
-  padding: 16px;
-  box-shadow: 0 10px 30px rgba(17, 34, 23, 0.08);
+  padding: 12px;
+  box-shadow: var(--soft-shadow);
   height: 100%;
 }
 
 .hidden { display: none !important; }
 
 h2 {
-  margin: 0 0 10px;
-  font-size: clamp(18px, 3.5vw, 24px);
+  margin: 0 0 12px;
+  font-size: clamp(20px, 3.5vw, 30px);
+  letter-spacing: -0.02em;
 }
 
 p {
@@ -141,7 +148,7 @@ textarea {
   width: 100%;
   border: 1px solid var(--line);
   background: var(--panel-strong);
-  border-radius: 12px;
+  border-radius: 10px;
   padding: 10px;
   font: inherit;
   color: var(--text);
@@ -156,26 +163,60 @@ textarea {
   margin-top: 12px;
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 button {
-  border: none;
-  border-radius: 12px;
-  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 10px 20px;
   font: inherit;
   font-weight: 600;
   cursor: pointer;
+  transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease, transform 140ms ease, box-shadow 180ms ease;
+  -webkit-font-smoothing: antialiased;
 }
 
 .btn-primary {
-  background: var(--accent);
+  background: linear-gradient(180deg, #1484ff 0%, #0071e3 100%);
   color: #fff;
+  border-color: #0071e3;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.3) inset, 0 7px 16px rgba(0, 113, 227, 0.28);
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.24) inset, 0 8px 18px rgba(0, 113, 227, 0.28);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.2) inset, 0 3px 10px rgba(0, 113, 227, 0.25);
 }
 
 .btn-ghost {
   background: #fff;
   color: var(--text);
-  border: 1px solid var(--line);
+  border: 1px solid #d2d2d7;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset;
+}
+
+.btn-ghost:hover {
+  background: #f7f7f8;
+  border-color: #c7c7cc;
+  transform: translateY(-1px);
+}
+
+.btn-ghost:active {
+  transform: translateY(0);
+  background: #f0f0f2;
+}
+
+button:focus-visible {
+  outline: 2px solid rgba(0, 113, 227, 0.45);
+  outline-offset: 2px;
 }
 
 .result {
@@ -184,8 +225,8 @@ button {
 }
 
 .metric {
-  padding: 12px;
-  border-radius: 14px;
+  padding: 14px;
+  border-radius: 16px;
   border: 1px solid var(--line);
   background: var(--panel-strong);
 }
@@ -229,9 +270,174 @@ button {
   color: #7a5b10;
 }
 
+.patient-list {
+  margin-top: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.patient-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel-strong);
+  padding: 10px;
+}
+
+.patient-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.patient-title {
+  font-weight: 700;
+}
+
+.history-wrap {
+  margin-top: 0;
+  border-top: 1px solid #ececf0;
+  padding-top: 20px;
+}
+
+.history-scroll {
+  width: 100%;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+}
+
+.history-filters {
+  margin-bottom: 10px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.history-filters input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px;
+  font: inherit;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.history-table {
+  width: max-content;
+  min-width: 100%;
+  table-layout: auto;
+  border-collapse: collapse;
+  font-size: 13px;
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.history-table th,
+.history-table td {
+  border-bottom: 1px solid var(--line);
+  padding: 8px;
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+  scroll-snap-align: start;
+}
+
+.history-table th {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  background: #fbfbfd;
+}
+
+.history-table tr:last-child td {
+  border-bottom: none;
+}
+
+.mini-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+  font-size: 13px;
+}
+.mini-table th {
+  background: #fbfbfd;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.mini-table th,
+.mini-table td {
+  border-bottom: 1px solid var(--line);
+  padding: 8px;
+  text-align: left;
+}
+
+.mini-table tr:last-child td {
+  border-bottom: none;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(29, 29, 31, 0.48);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 50;
+}
+
+.modal {
+  width: min(980px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  border: 1px solid #e5e5ea;
+  border-radius: 24px;
+  background: var(--panel-strong);
+  padding: 22px;
+  box-shadow: 0 22px 56px rgba(0, 0, 0, 0.22);
+}
+
+.modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.modal-x {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #f5f5f7;
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
 @media (max-width: 920px) {
   .grid { grid-template-columns: 1fr; }
   .form-grid { grid-template-columns: 1fr; }
+  .history-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .topbar { padding-top: 6px; padding-bottom: 6px; }
+  .page { padding: 8px; }
 }
 </style>
 </head>
@@ -239,98 +445,173 @@ button {
   <div class="page">
     <div class="topbar">
       <div class="brand">Parkinome Console</div>
+      <div class="hero-sub">Clinical prediction workspace</div>
     </div>
 
-    <div id="doctorUI" class="grid">
-      <section class="panel">
-        <h2>Single Patient Prediction</h2>
-        <p>Заполни любое количество полей. Модель сама учтёт доступные группы признаков.</p>
+    <div id="doctorUI" class="actions" style="margin-top:0; margin-bottom:12px;">
+      <button id="btnOpenPatientsModal" type="button" class="btn-ghost">Add Patient</button>
+    </div>
 
-        <div class="form-grid">
-          <div class="field"><label>Patient ID</label><input id="patient_id" type="text" placeholder="e.g. P-1024"></div>
-          <div class="field"><label>Age (30-90)</label><input id="age" type="number" min="30" max="90" step="1" placeholder="e.g. 67"></div>
-          <div class="field"><label>UPDRS III (0-132)</label><input id="updrs" type="number" min="0" max="132" step="1" placeholder="e.g. 38"></div>
-          <div class="field"><label>MOCA (0-30)</label><input id="moca" type="number" min="0" max="30" step="1" placeholder="e.g. 22"></div>
-          <div class="field"><label>SCOPA AUT (0-69)</label><input id="scopa" type="number" min="0" max="69" step="1" placeholder="e.g. 24"></div>
-          <div class="field"><label>Hoehn-Yahr (1-5)</label><input id="hy" type="number" min="1" max="5" step="0.1" placeholder="e.g. 2.5"></div>
-          <div class="field"><label>NDUFA4L2 (-10..10)</label><input id="ndufa4l2" type="number" min="-10" max="10" step="0.01" placeholder="e.g. 4.1"></div>
-          <div class="field"><label>NDUFS2 (-10..10)</label><input id="ndufs2" type="number" min="-10" max="10" step="0.01" placeholder="e.g. 3.8"></div>
-          <div class="field"><label>PINK1 (-10..10)</label><input id="pink1" type="number" min="-10" max="10" step="0.01" placeholder="e.g. 2.2"></div>
-          <div class="field"><label>PPARGC1A (-10..10)</label><input id="ppargc1a" type="number" min="-10" max="10" step="0.01" placeholder="e.g. 3.4"></div>
-          <div class="field"><label>NLRP3 (-10..10)</label><input id="nlrp3" type="number" min="-10" max="10" step="0.01" placeholder="e.g. 6.1"></div>
-          <div class="field"><label>IL1B (-10..10)</label><input id="il1b" type="number" min="-10" max="10" step="0.01" placeholder="e.g. 5.2"></div>
-          <div class="field"><label>S100A8 (-10..10)</label><input id="s100a8" type="number" min="-10" max="10" step="0.01" placeholder="e.g. 4.9"></div>
-          <div class="field"><label>CXCL8 (-10..10)</label><input id="cxcl8" type="number" min="-10" max="10" step="0.01" placeholder="e.g. 5.6"></div>
-        </div>
+    <section class="panel history-wrap">
+      <h2>Saved Patients</h2>
+      <div class="history-filters">
+        <input data-hf="id" placeholder="ID">
+        <input data-hf="patient_id" placeholder="Patient ID">
+        <input data-hf="age" placeholder="Age">
+        <input data-hf="updrs_iii" placeholder="UPDRS III">
+        <input data-hf="moca" placeholder="MOCA">
+        <input data-hf="scopa_aut" placeholder="SCOPA AUT">
+        <input data-hf="hoehn_yahr" placeholder="Hoehn-Yahr">
+        <input data-hf="ndufa4l2" placeholder="NDUFA4L2">
+        <input data-hf="ndufs2" placeholder="NDUFS2">
+        <input data-hf="pink1" placeholder="PINK1">
+        <input data-hf="ppargc1a" placeholder="PPARGC1A">
+        <input data-hf="nlrp3" placeholder="NLRP3">
+        <input data-hf="il1b" placeholder="IL1B">
+        <input data-hf="s100a8" placeholder="S100A8">
+        <input data-hf="cxcl8" placeholder="CXCL8">
+        <input data-hf="risk_probability" placeholder="Risk %">
+        <input data-hf="category" placeholder="Category">
+        <input data-hf="confidence" placeholder="Confidence">
+        <input data-hf="isp" placeholder="ISP">
+        <input data-hf="created_at" placeholder="Saved At">
+      </div>
+      <div class="history-scroll">
+      <table class="history-table">
+        <colgroup>
+          <col style="width:70px">
+          <col style="width:130px">
+          <col style="width:70px">
+          <col style="width:90px">
+          <col style="width:70px">
+          <col style="width:90px">
+          <col style="width:95px">
+          <col style="width:90px">
+          <col style="width:90px">
+          <col style="width:80px">
+          <col style="width:95px">
+          <col style="width:80px">
+          <col style="width:70px">
+          <col style="width:80px">
+          <col style="width:80px">
+          <col style="width:80px">
+          <col style="width:90px">
+          <col style="width:90px">
+          <col style="width:70px">
+          <col style="width:170px">
+        </colgroup>
+        <thead id="historyHead">
+          <tr>
+            <th>ID</th>
+            <th>Patient ID</th>
+            <th>Age</th>
+            <th>UPDRS III</th>
+            <th>MOCA</th>
+            <th>SCOPA AUT</th>
+            <th>Hoehn-Yahr</th>
+            <th>NDUFA4L2</th>
+            <th>NDUFS2</th>
+            <th>PINK1</th>
+            <th>PPARGC1A</th>
+            <th>NLRP3</th>
+            <th>IL1B</th>
+            <th>S100A8</th>
+            <th>CXCL8</th>
+            <th>Risk %</th>
+            <th>Category</th>
+            <th>Confidence</th>
+            <th>ISP</th>
+            <th>Saved At</th>
+          </tr>
+        </thead>
+        <tbody id="historyBody">
+          <tr><td colspan="20">No saved records yet.</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+  </div>
 
+  <div id="patientsModal" class="modal-backdrop hidden">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Patients</h2>
+        <button id="btnClosePatientsModal" type="button" class="modal-x" aria-label="Close">×</button>
+      </div>
+      <p>Добавляй пациентов, запускай расчет и сохраняй результат.</p>
+      <div class="actions">
+        <button id="btnUploadPatients" type="button" class="btn-ghost">Upload CSV/Excel</button>
+        <button id="btnDownloadTemplate" type="button" class="btn-ghost">Download CSV Template</button>
+        <input id="patientsFileInput" type="file" accept=".csv,.xlsx,.xls" class="hidden">
+      </div>
+      <p id="uploadMeta" class="hero-sub" style="margin-top:8px; font-size:13px;"></p>
+      <div id="patientsList" class="patient-list"></div>
       <div class="actions">
         <button id="btnPredict" type="button" class="btn-primary">Run Prediction</button>
+        <button id="btnExample" type="button" class="btn-ghost">Insert Example</button>
         <button id="btnSaveDb" type="button" class="btn-ghost">Save To DB</button>
         <button id="btnClear" type="button" class="btn-ghost">Clear</button>
       </div>
-      </section>
-
-      <aside class="panel">
-        <h2>Result</h2>
-        <div class="result">
-          <div class="metric">
-            <div class="k">Risk Probability</div>
-            <div id="risk" class="v">-</div>
-          </div>
-          <div class="metric">
-            <div class="k">Category</div>
-            <div id="category" class="v">-</div>
-          </div>
-          <div class="metric">
-            <div class="k">Confidence</div>
-            <div id="confidence" class="v">-</div>
-          </div>
-          <div class="metric">
-            <div class="k">ISP</div>
-            <div id="isp" class="v">-</div>
-          </div>
-        </div>
-        <div id="doctorError" class="notice hidden"></div>
-      </aside>
+      <h2 style="margin-top:12px">Prediction Rows</h2>
+      <table class="mini-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Patient ID</th>
+            <th>Risk %</th>
+            <th>Category</th>
+            <th>Confidence</th>
+            <th>ISP</th>
+          </tr>
+        </thead>
+        <tbody id="predictRowsBody">
+          <tr><td colspan="6">No prediction yet.</td></tr>
+        </tbody>
+      </table>
+      <div id="doctorError" class="notice hidden"></div>
     </div>
-
-    <section id="researchUI" class="panel hidden">
-      <h2>Batch Mode</h2>
-      <p>Вставь JSON-массив пациентов и запусти массовый расчёт.</p>
-      <div class="actions">
-        <button id="btnBatchRun" type="button" class="btn-primary">Run Batch</button>
-        <button id="btnBatchExample" type="button" class="btn-ghost">Insert Example</button>
-      </div>
-      <div style="margin-top:10px">
-        <textarea id="batch" placeholder='[{"age":65,"updrs_iii":31},{"age":71,"moca":20,"nlrp3":7.2}]'></textarea>
-      </div>
-      <div id="out" class="code">-</div>
-    </section>
-
   </div>
 
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
 (() => {
   let currentToken = "token_admin";
   let lastPredictInput = null;
   let lastPredictOutput = null;
+  let isExampleData = false;
+  let uploadedPatients = [];
+  let predictInputRows = [];
+  let historyRowsRaw = [];
+  let historyFilters = {};
+  const historyColumns = ["id","patient_id","age","updrs_iii","moca","scopa_aut","hoehn_yahr","ndufa4l2","ndufs2","pink1","ppargc1a","nlrp3","il1b","s100a8","cxcl8","risk_probability","category","confidence","isp","created_at"];
+  let historySortKey = "";
+  let historySortDir = "asc";
   const $ = (id) => document.getElementById(id);
-
-  function n(v) {
-    if (v === '' || v === null || v === undefined) return undefined;
-    const x = Number(v);
-    return Number.isFinite(x) ? x : undefined;
-  }
+  const fieldDefs = [
+    ["patient_id", "Patient ID", "text", "", "", "", "e.g. P-1024"],
+    ["age", "Age (30-90)", "number", "30", "90", "1", "67"],
+    ["updrs_iii", "UPDRS III (0-132)", "number", "0", "132", "1", "38"],
+    ["moca", "MOCA (0-30)", "number", "0", "30", "1", "22"],
+    ["scopa_aut", "SCOPA AUT (0-69)", "number", "0", "69", "1", "24"],
+    ["hoehn_yahr", "Hoehn-Yahr (1-5)", "number", "1", "5", "0.1", "2.5"],
+    ["ndufa4l2", "NDUFA4L2 (-10..10)", "number", "-10", "10", "0.01", "4.1"],
+    ["ndufs2", "NDUFS2 (-10..10)", "number", "-10", "10", "0.01", "3.8"],
+    ["pink1", "PINK1 (-10..10)", "number", "-10", "10", "0.01", "2.2"],
+    ["ppargc1a", "PPARGC1A (-10..10)", "number", "-10", "10", "0.01", "3.4"],
+    ["nlrp3", "NLRP3 (-10..10)", "number", "-10", "10", "0.01", "6.1"],
+    ["il1b", "IL1B (-10..10)", "number", "-10", "10", "0.01", "5.2"],
+    ["s100a8", "S100A8 (-10..10)", "number", "-10", "10", "0.01", "4.9"],
+    ["cxcl8", "CXCL8 (-10..10)", "number", "-10", "10", "0.01", "5.6"]
+  ];
 
   function applyRole(role) {
     $("doctorUI").classList.add("hidden");
-    $("researchUI").classList.add("hidden");
-
     if (role === "doctor") $("doctorUI").classList.remove("hidden");
-    if (role === "researcher") $("researchUI").classList.remove("hidden");
     if (role === "admin") {
       $("doctorUI").classList.remove("hidden");
-      $("researchUI").classList.remove("hidden");
+    }
+    if (role === "researcher") {
+      $("doctorUI").classList.remove("hidden");
     }
   }
 
@@ -340,69 +621,458 @@ button {
     e.classList.remove("hidden");
   }
 
-  function buildDoctorPayload() {
-    // Отправляем только заполненные поля, чтобы сервер корректно определял доступные группы.
-    const raw = {
-      patient_id: $("patient_id").value.trim() || undefined,
-      age: n($("age").value),
-      updrs_iii: n($("updrs").value),
-      moca: n($("moca").value),
-      scopa_aut: n($("scopa").value),
-      hoehn_yahr: n($("hy").value),
-      ndufa4l2: n($("ndufa4l2").value),
-      ndufs2: n($("ndufs2").value),
-      pink1: n($("pink1").value),
-      ppargc1a: n($("ppargc1a").value),
-      nlrp3: n($("nlrp3").value),
-      il1b: n($("il1b").value),
-      s100a8: n($("s100a8").value),
-      cxcl8: n($("cxcl8").value)
-    };
-    return Object.fromEntries(Object.entries(raw).filter(([, v]) => v !== undefined));
+  function normalizeFieldKey(key) {
+    return String(key || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[%()]/g, "")
+      .replace(/[\s\-]+/g, "_");
   }
 
-  function validatePayload(payload) {
-    // Клиентская валидация повторяет диапазоны сервера для быстрого отклика в интерфейсе.
-    const checks = [
-      ["age", 30, 90],
-      ["updrs_iii", 0, 132],
-      ["moca", 0, 30],
-      ["scopa_aut", 0, 69],
-      ["hoehn_yahr", 1, 5],
-      ["ndufa4l2", -10, 10],
-      ["ndufs2", -10, 10],
-      ["pink1", -10, 10],
-      ["ppargc1a", -10, 10],
-      ["nlrp3", -10, 10],
-      ["il1b", -10, 10],
-      ["s100a8", -10, 10],
-      ["cxcl8", -10, 10]
-    ];
-
-    for (const [key, min, max] of checks) {
-      if (payload[key] === undefined) continue;
-      if (payload[key] < min || payload[key] > max) {
-        throw new Error(`${key} must be in range [${min}, ${max}]`);
+  function parsePatientObject(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    const patient = {};
+    for (const [key, value] of Object.entries(raw)) {
+      const k = normalizeFieldKey(key);
+      const def = fieldDefs.find(([name]) => name === k);
+      if (!def) continue;
+      if (k === "patient_id") {
+        const pid = String(value ?? "").trim();
+        if (pid) patient.patient_id = pid;
+        continue;
       }
+      const num = Number(String(value ?? "").trim().replace(",", "."));
+      if (Number.isFinite(num)) patient[k] = num;
     }
+    return Object.keys(patient).length ? patient : null;
   }
 
-  function classByRisk(v) {
-    if (v < 0.33) return "low";
-    if (v < 0.66) return "mid";
-    return "high";
+  function parsePatientsCsv(text) {
+    const rows = String(text || "").split(/\r?\n/).filter((line) => line.trim());
+    if (rows.length < 2) return [];
+    const headers = rows[0].split(",").map((h) => normalizeFieldKey(h.replace(/^"|"$/g, "")));
+    const patients = [];
+    for (let i = 1; i < rows.length; i++) {
+      const cols = rows[i].split(",").map((v) => v.replace(/^"|"$/g, "").trim());
+      const raw = {};
+      headers.forEach((h, idx) => { raw[h] = cols[idx] ?? ""; });
+      const p = parsePatientObject(raw);
+      if (p) patients.push(p);
+    }
+    return patients;
+  }
+
+  async function parsePatientsFile(file) {
+    const name = (file?.name || "").toLowerCase();
+    if (name.endsWith(".csv")) {
+      const text = await file.text();
+      return parsePatientsCsv(text);
+    }
+    if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
+      if (!window.XLSX) {
+        throw new Error("Excel parser unavailable. Reload page and try again.");
+      }
+      const ab = await file.arrayBuffer();
+      const wb = window.XLSX.read(ab, { type: "array" });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = window.XLSX.utils.sheet_to_json(sheet, { defval: "" });
+      return rows.map(parsePatientObject).filter(Boolean);
+    }
+    throw new Error("Unsupported file type. Use CSV or Excel.");
+  }
+
+  function openPatientsModal(forceFresh = false) {
+    if (forceFresh || ($("patientsList") && $("patientsList").children.length === 0)) {
+      addPatientCard();
+      uploadedPatients = [];
+      isExampleData = false;
+      if ($("uploadMeta")) $("uploadMeta").innerText = "";
+      $("predictRowsBody").innerHTML = `<tr><td colspan="6">No prediction yet.</td></tr>`;
+      $("doctorError").classList.add("hidden");
+      lastPredictInput = null;
+      lastPredictOutput = null;
+    }
+    $("patientsModal")?.classList.remove("hidden");
+  }
+
+  function closePatientsModal() {
+    $("patientsModal")?.classList.add("hidden");
+  }
+
+  function addPatientCard(seed = {}) {
+    const idx = 1;
+    const card = document.createElement("div");
+    card.className = "patient-card";
+    card.dataset.patientCard = "1";
+    card.innerHTML = `
+      <div class="patient-head">
+        <div class="patient-title">Patient #${idx}</div>
+      </div>
+      <div class="form-grid">
+        ${fieldDefs.map(([key, label, type, min, max, step, ph]) => `
+          <div class="field">
+            <label>${label}</label>
+            <input data-field="${key}" type="${type}" ${min ? `min="${min}"` : ""} ${max ? `max="${max}"` : ""} ${step ? `step="${step}"` : ""} placeholder="${ph}">
+          </div>
+        `).join("")}
+      </div>
+    `;
+
+    card.querySelectorAll("[data-field]").forEach((el) => {
+      const key = el.getAttribute("data-field");
+      if (seed[key] !== undefined && seed[key] !== null) {
+        el.value = String(seed[key]);
+      }
+      el.addEventListener("input", () => {
+        isExampleData = false;
+      });
+    });
+
+    $("patientsList").innerHTML = "";
+    $("patientsList").appendChild(card);
+    renumberPatients();
+  }
+
+  function renumberPatients() {
+    [...$("patientsList").querySelectorAll("[data-patient-card]")].forEach((card, i) => {
+      const title = card.querySelector(".patient-title");
+      if (title) title.innerText = `Patient #${i + 1}`;
+    });
+  }
+
+  function parsePatientCard(card) {
+    const patient = {};
+    card.querySelectorAll("[data-field]").forEach((el) => {
+      const key = el.getAttribute("data-field");
+      const raw = (el.value || "").trim();
+      if (!raw) return;
+      if (key === "patient_id") {
+        patient[key] = raw;
+        return;
+      }
+      const num = Number(raw);
+      if (Number.isFinite(num)) patient[key] = num;
+    });
+    return patient;
+  }
+
+  function buildPatientsPayload() {
+    if (uploadedPatients.length > 0) {
+      return { patients: uploadedPatients };
+    }
+    const card = $("patientsList")?.querySelector("[data-patient-card]");
+    const patient = card ? parsePatientCard(card) : {};
+    if (!patient || Object.keys(patient).length === 0) {
+      throw new Error("Fill at least one field or upload a CSV/Excel file.");
+    }
+    return { patients: [patient] };
   }
 
   function clearDoctorForm() {
-    ["patient_id","age","updrs","moca","scopa","hy","ndufa4l2","ndufs2","pink1","ppargc1a","nlrp3","il1b","s100a8","cxcl8"]
-      .forEach((id) => { $(id).value = ""; });
-    $("risk").innerText = "-";
-    $("category").innerText = "-";
-    $("confidence").innerText = "-";
-    $("isp").innerText = "-";
-    $("doctorError").classList.add("hidden");
-    lastPredictInput = null;
-    lastPredictOutput = null;
+    $("patientsList")?.querySelectorAll("[data-field]").forEach((el) => {
+      el.value = "";
+    });
+    isExampleData = false;
+    uploadedPatients = [];
+    if ($("uploadMeta")) $("uploadMeta").innerText = "";
+  }
+
+  function renderPredictRows(res) {
+    const body = $("predictRowsBody");
+    if (!body) return;
+    const rows = Array.isArray(res?.patients) ? res.patients : [];
+    const inputRows = Array.isArray(lastPredictInput?.patients) ? lastPredictInput.patients : [];
+    predictInputRows = inputRows;
+    if (rows.length === 0) {
+      body.innerHTML = `<tr><td colspan="6">No prediction yet.</td></tr>`;
+      return;
+    }
+    body.innerHTML = rows.map((p, i) => {
+      const risk = Number(p.risk_probability);
+      const riskText = Number.isFinite(risk) ? (risk * 100).toFixed(1) : "-";
+      const conf = (typeof p.confidence === "number") ? p.confidence.toFixed(2) : "-";
+      const isp = (typeof p.isp === "number") ? p.isp.toFixed(3) : "-";
+      return `<tr data-predict-row="${i}" style="cursor:pointer">
+        <td>${i + 1}</td>
+        <td>${p.patient_id || "-"}</td>
+        <td>${riskText}</td>
+        <td>${p.category || "-"}</td>
+        <td>${conf}</td>
+        <td>${isp}</td>
+      </tr>`;
+    }).join("");
+  }
+
+  function openPatientCardFromPredictRow(idx) {
+    const p = predictInputRows[idx];
+    if (!p) return;
+    addPatientCard({
+      patient_id: p.patient_id ?? "",
+      age: p.age ?? "",
+      updrs_iii: p.updrs_iii ?? "",
+      moca: p.moca ?? "",
+      scopa_aut: p.scopa_aut ?? "",
+      hoehn_yahr: p.hoehn_yahr ?? "",
+      ndufa4l2: p.ndufa4l2 ?? "",
+      ndufs2: p.ndufs2 ?? "",
+      pink1: p.pink1 ?? "",
+      ppargc1a: p.ppargc1a ?? "",
+      nlrp3: p.nlrp3 ?? "",
+      il1b: p.il1b ?? "",
+      s100a8: p.s100a8 ?? "",
+      cxcl8: p.cxcl8 ?? ""
+    });
+    uploadedPatients = [];
+    isExampleData = false;
+  }
+
+  function toPatientsArray(jsonText) {
+    try {
+      const parsed = JSON.parse(jsonText || "{}");
+      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed.patients)) return parsed.patients;
+      if (parsed && typeof parsed === "object") return [parsed];
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function hasFlatHistoryFields(row) {
+    if (!row || typeof row !== "object") return false;
+    return ("risk_probability" in row) || ("age" in row) || ("updrs_iii" in row);
+  }
+
+  function historyValue(row, col) {
+    const v = row[col];
+    if (col === "risk_probability" && typeof v === "number") return (v * 100).toFixed(1);
+    if (col === "confidence" && typeof v === "number") return v.toFixed(2);
+    if (col === "isp" && typeof v === "number") return v.toFixed(3);
+    if (v === null || v === undefined) return "";
+    return String(v);
+  }
+
+  function passesHistoryFilters(row) {
+    for (const col of historyColumns) {
+      const q = (historyFilters[col] || "").trim().toLowerCase();
+      if (!q) continue;
+      if (!historyValue(row, col).toLowerCase().includes(q)) return false;
+    }
+    return true;
+  }
+
+  function compareHistoryRows(a, b, key, dir) {
+    const mul = dir === "desc" ? -1 : 1;
+    const av = historyValue(a, key);
+    const bv = historyValue(b, key);
+    const an = Number(av);
+    const bn = Number(bv);
+    if (Number.isFinite(an) && Number.isFinite(bn)) {
+      if (an < bn) return -1 * mul;
+      if (an > bn) return 1 * mul;
+      return 0;
+    }
+    if (av < bv) return -1 * mul;
+    if (av > bv) return 1 * mul;
+    return 0;
+  }
+
+  function renderSortHints() {
+    const head = $("historyHead");
+    if (!head) return;
+    const ths = head.querySelectorAll("tr:first-child th");
+    ths.forEach((th, i) => {
+      const col = historyColumns[i];
+      if (!col) return;
+      const base = th.dataset.label || th.textContent.trim();
+      if (!th.dataset.label) th.dataset.label = base;
+      th.style.cursor = "pointer";
+      th.textContent = (historySortKey === col)
+        ? `${base}${historySortDir === "asc" ? " ↑" : " ↓"}`
+        : base;
+    });
+  }
+
+  function initHistorySorting() {
+    const head = $("historyHead");
+    if (!head) return;
+    const ths = head.querySelectorAll("tr:first-child th");
+    ths.forEach((th, i) => {
+      const col = historyColumns[i];
+      if (!col) return;
+      th.addEventListener("click", () => {
+        if (historySortKey === col) {
+          historySortDir = historySortDir === "asc" ? "desc" : "asc";
+        } else {
+          historySortKey = col;
+          historySortDir = "asc";
+        }
+        renderHistory(historyRowsRaw);
+      });
+    });
+    renderSortHints();
+  }
+
+  function applyHistoryFiltersDom() {
+    const body = $("historyBody");
+    if (!body) return;
+    const rows = [...body.querySelectorAll("tr")];
+    const filters = historyColumns.map((col) => ((historyFilters[col] || "").trim().toLowerCase()));
+    let visible = 0;
+
+    rows.forEach((tr) => {
+      const tds = [...tr.querySelectorAll("td")];
+      if (tds.length !== historyColumns.length) return;
+      let ok = true;
+      for (let i = 0; i < historyColumns.length; i++) {
+        const q = filters[i];
+        if (!q) continue;
+        const text = (tds[i]?.innerText || "").trim().toLowerCase();
+        if (!text.includes(q)) {
+          ok = false;
+          break;
+        }
+      }
+      tr.style.display = ok ? "" : "none";
+      if (ok) visible++;
+    });
+
+    const empty = $("historyNoMatch");
+    if (empty) empty.remove();
+    if (visible === 0 && rows.length > 0) {
+      const tr = document.createElement("tr");
+      tr.id = "historyNoMatch";
+      tr.innerHTML = `<td colspan="20">No rows match current filters.</td>`;
+      body.appendChild(tr);
+    }
+  }
+
+  function renderHistory(rows) {
+    const body = $("historyBody");
+    if (!body) return;
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+      body.innerHTML = `<tr><td colspan="20">No saved records yet.</td></tr>`;
+      return;
+    }
+
+    const uniqueRows = [];
+    const seen = new Set();
+    for (const row of rows) {
+      const key = [
+        row.patient_id || "",
+        row.input_json || "",
+        row.output_json || ""
+      ].join("|");
+      if (seen.has(key)) continue;
+      seen.add(key);
+      uniqueRows.push(row);
+    }
+
+    const normalizedRows = [];
+    for (const row of uniqueRows) {
+      if (hasFlatHistoryFields(row)) {
+        normalizedRows.push({
+          id: row.id ?? null,
+          patient_id: row.patient_id ?? null,
+          age: row.age ?? null,
+          updrs_iii: row.updrs_iii ?? null,
+          moca: row.moca ?? null,
+          scopa_aut: row.scopa_aut ?? null,
+          hoehn_yahr: row.hoehn_yahr ?? null,
+          ndufa4l2: row.ndufa4l2 ?? null,
+          ndufs2: row.ndufs2 ?? null,
+          pink1: row.pink1 ?? null,
+          ppargc1a: row.ppargc1a ?? null,
+          nlrp3: row.nlrp3 ?? null,
+          il1b: row.il1b ?? null,
+          s100a8: row.s100a8 ?? null,
+          cxcl8: row.cxcl8 ?? null,
+          risk_probability: (typeof row.risk_probability === "number") ? row.risk_probability : null,
+          category: row.category ?? null,
+          confidence: (typeof row.confidence === "number") ? row.confidence : null,
+          isp: (typeof row.isp === "number") ? row.isp : null,
+          created_at: row.created_at ?? null
+        });
+        continue;
+      }
+
+      const inputPatients = toPatientsArray(row.input_json);
+      const outputPatients = toPatientsArray(row.output_json);
+      const len = Math.max(inputPatients.length, outputPatients.length, 1);
+
+      for (let i = 0; i < len; i++) {
+        const input = inputPatients[i] || {};
+        const out = outputPatients[i] || {};
+        const risk = Number(out.risk_probability);
+        const pid = input.patient_id || out.patient_id || row.patient_id || "-";
+
+        normalizedRows.push({
+          id: row.id ?? null,
+          patient_id: pid,
+          age: input.age ?? null,
+          updrs_iii: input.updrs_iii ?? null,
+          moca: input.moca ?? null,
+          scopa_aut: input.scopa_aut ?? null,
+          hoehn_yahr: input.hoehn_yahr ?? null,
+          ndufa4l2: input.ndufa4l2 ?? null,
+          ndufs2: input.ndufs2 ?? null,
+          pink1: input.pink1 ?? null,
+          ppargc1a: input.ppargc1a ?? null,
+          nlrp3: input.nlrp3 ?? null,
+          il1b: input.il1b ?? null,
+          s100a8: input.s100a8 ?? null,
+          cxcl8: input.cxcl8 ?? null,
+          risk_probability: Number.isFinite(risk) ? risk : null,
+          category: out.category ?? null,
+          confidence: (typeof out.confidence === "number") ? out.confidence : null,
+          isp: (typeof out.isp === "number") ? out.isp : null,
+          created_at: row.created_at ?? null
+        });
+      }
+    }
+
+    const sortedRows = historySortKey
+      ? [...normalizedRows].sort((a, b) => compareHistoryRows(a, b, historySortKey, historySortDir))
+      : normalizedRows;
+    body.innerHTML = sortedRows.map((r) => `
+      <tr>
+        <td>${r.id ?? "-"}</td>
+        <td>${r.patient_id ?? "-"}</td>
+        <td>${r.age ?? "-"}</td>
+        <td>${r.updrs_iii ?? "-"}</td>
+        <td>${r.moca ?? "-"}</td>
+        <td>${r.scopa_aut ?? "-"}</td>
+        <td>${r.hoehn_yahr ?? "-"}</td>
+        <td>${r.ndufa4l2 ?? "-"}</td>
+        <td>${r.ndufs2 ?? "-"}</td>
+        <td>${r.pink1 ?? "-"}</td>
+        <td>${r.ppargc1a ?? "-"}</td>
+        <td>${r.nlrp3 ?? "-"}</td>
+        <td>${r.il1b ?? "-"}</td>
+        <td>${r.s100a8 ?? "-"}</td>
+        <td>${r.cxcl8 ?? "-"}</td>
+        <td>${historyValue(r, "risk_probability") || "-"}</td>
+        <td>${r.category ?? "-"}</td>
+        <td>${historyValue(r, "confidence") || "-"}</td>
+        <td>${historyValue(r, "isp") || "-"}</td>
+        <td>${r.created_at ?? "-"}</td>
+      </tr>
+    `).join("");
+    renderSortHints();
+    applyHistoryFiltersDom();
+  }
+
+  async function loadHistory() {
+    try {
+      const r = await fetch("/history", { headers: { Authorization: "Bearer " + currentToken } });
+      if (!r.ok) return;
+      const rows = await r.json();
+      historyRowsRaw = Array.isArray(rows) ? rows : [];
+      renderHistory(rows);
+    } catch (_) {
+      /* silent */
+    }
   }
 
   async function loadRole() {
@@ -425,11 +1095,7 @@ button {
   async function predict() {
     $("doctorError").classList.add("hidden");
     try {
-      const payload = buildDoctorPayload();
-      if (Object.keys(payload).length === 0) {
-        throw new Error("Fill at least one input field before prediction.");
-      }
-      validatePayload(payload);
+      const payload = buildPatientsPayload();
 
       const r = await fetch("/predict", {
         method: "POST",
@@ -439,16 +1105,11 @@ button {
       const txt = await r.text();
       if (!r.ok) throw new Error(txt || ("HTTP " + r.status));
       const res = JSON.parse(txt);
+      const first = Array.isArray(res.patients) ? res.patients[0] : null;
+      if (!first) throw new Error("Server returned empty patients list.");
       lastPredictInput = payload;
       lastPredictOutput = res;
-
-      const rp = Number(res.risk_probability);
-      $("risk").className = "v " + classByRisk(rp);
-      $("category").className = "v " + classByRisk(rp);
-      $("risk").innerText = Number.isFinite(rp) ? (rp * 100).toFixed(1) + "%" : "-";
-      $("category").innerText = res.category || "-";
-      $("confidence").innerText = typeof res.confidence === "number" ? res.confidence.toFixed(2) : "-";
-      $("isp").innerText = typeof res.isp === "number" ? res.isp.toFixed(3) : "-";
+      renderPredictRows(res);
     } catch (err) {
       showDoctorError("Prediction failed: " + err.message);
     }
@@ -459,6 +1120,9 @@ button {
     try {
       if (!lastPredictInput || !lastPredictOutput) {
         throw new Error("Сначала выполните прогноз, потом сохраняйте в БД.");
+      }
+      if (isExampleData) {
+        throw new Error("Примерные данные нельзя сохранять в БД. Измени хотя бы одно поле.");
       }
 
       const r = await fetch("/save", {
@@ -471,42 +1135,130 @@ button {
       });
 
       const txt = await r.text();
-      if (!r.ok) throw new Error(txt || ("HTTP " + r.status));
+      if (!r.ok) {
+        if (r.status === 409) {
+          throw new Error("Запись с таким Patient ID уже существует. Используйте уникальный Patient ID.");
+        }
+        throw new Error(txt || ("HTTP " + r.status));
+      }
       showDoctorError("Сохранено в БД.");
+      await loadHistory();
     } catch (err) {
       showDoctorError("Сохранение не выполнено: " + err.message);
     }
   }
 
-  function setBatchExample() {
-    $("batch").value = JSON.stringify([
-      { patient_id: "P-1001", age: 65, updrs_iii: 31, moca: 23, hoehn_yahr: 2 },
-      { patient_id: "P-1002", age: 71, updrs_iii: 48, nlrp3: 7.2, il1b: 6.4, cxcl8: 6.8 }
-    ], null, 2);
+  function setPatientsExample() {
+    addPatientCard({
+      patient_id: "P-1001",
+      age: 65,
+      updrs_iii: 31,
+      moca: 23,
+      scopa_aut: 24,
+      hoehn_yahr: 2.0,
+      ndufa4l2: 4.1,
+      ndufs2: 3.8,
+      pink1: 2.2,
+      ppargc1a: 3.4,
+      nlrp3: 6.1,
+      il1b: 5.2,
+      s100a8: 4.9,
+      cxcl8: 5.6
+    });
+    isExampleData = true;
+    uploadedPatients = [];
+    if ($("uploadMeta")) $("uploadMeta").innerText = "";
+    lastPredictInput = null;
+    lastPredictOutput = null;
+    $("predictRowsBody").innerHTML = `<tr><td colspan="6">No prediction yet.</td></tr>`;
+    $("doctorError").classList.add("hidden");
   }
 
-  async function runBatch() {
+  async function onPatientsFileSelected(e) {
+    $("doctorError").classList.add("hidden");
     try {
-      const r = await fetch("/batch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + currentToken },
-        body: $("batch").value
-      });
-      const txt = await r.text();
-      if (!r.ok) throw new Error(txt || ("HTTP " + r.status));
-      $("out").innerText = txt;
+      const file = e?.target?.files?.[0];
+      if (!file) return;
+      const patients = await parsePatientsFile(file);
+      if (!patients.length) throw new Error("No valid patient rows in file.");
+      uploadedPatients = patients;
+      isExampleData = false;
+      lastPredictInput = null;
+      lastPredictOutput = null;
+      if ($("uploadMeta")) {
+        $("uploadMeta").innerText = `Loaded ${patients.length} patients from ${file.name}`;
+      }
+      if (patients[0]) addPatientCard(patients[0]);
+      $("predictRowsBody").innerHTML = `<tr><td colspan="6">No prediction yet.</td></tr>`;
     } catch (err) {
-      $("out").innerText = "Batch failed: " + err.message;
+      showDoctorError("File import failed: " + err.message);
+    } finally {
+      if (e?.target) e.target.value = "";
     }
   }
 
+  function downloadCsvTemplate() {
+    const header = [
+      "patient_id","age","updrs_iii","moca","scopa_aut","hoehn_yahr",
+      "ndufa4l2","ndufs2","pink1","ppargc1a","nlrp3","il1b","s100a8","cxcl8"
+    ].join(",");
+    const samples = [
+      ["P-1001","65","31","23","24","2.0","4.1","3.8","2.2","3.4","6.1","5.2","4.9","5.6"],
+      ["P-1002","58","27","25","19","1.5","3.6","3.2","1.9","2.8","4.8","4.1","3.9","4.3"],
+      ["P-1003","71","42","18","30","3.0","5.4","4.9","3.1","4.5","7.2","6.3","5.8","6.6"],
+      ["P-1004","63","29","24","22","2.0","4.0","3.5","2.0","3.1","5.6","4.8","4.4","5.0"],
+      ["P-1005","67","35","21","26","2.5","4.7","4.2","2.6","3.9","6.4","5.6","5.1","5.9"],
+      ["P-1006","54","22","27","16","1.0","3.1","2.8","1.5","2.4","4.2","3.5","3.3","3.8"],
+      ["P-1007","76","48","16","34","3.5","5.9","5.1","3.5","4.9","7.8","6.9","6.2","7.1"],
+      ["P-1008","60","25","26","18","1.5","3.4","3.0","1.7","2.6","4.5","3.9","3.6","4.1"],
+      ["P-1009","69","38","20","28","2.5","5.0","4.4","2.8","4.1","6.8","6.0","5.4","6.2"],
+      ["P-1010","62","30","23","23","2.0","4.2","3.7","2.1","3.2","5.9","5.0","4.6","5.3"]
+    ];
+    const csv = `${header}\n${samples.map((row) => row.join(",")).join("\n")}\n`;
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "patients_template.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  $("btnOpenPatientsModal")?.addEventListener("click", () => openPatientsModal(true));
+  $("btnClosePatientsModal")?.addEventListener("click", closePatientsModal);
+  $("patientsModal")?.addEventListener("click", (e) => {
+    if (e.target && e.target.id === "patientsModal") closePatientsModal();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closePatientsModal();
+  });
   $("btnPredict")?.addEventListener("click", predict);
+  $("btnUploadPatients")?.addEventListener("click", () => $("patientsFileInput")?.click());
+  $("btnDownloadTemplate")?.addEventListener("click", downloadCsvTemplate);
+  $("patientsFileInput")?.addEventListener("change", onPatientsFileSelected);
+  $("btnExample")?.addEventListener("click", setPatientsExample);
   $("btnSaveDb")?.addEventListener("click", saveToDb);
   $("btnClear")?.addEventListener("click", clearDoctorForm);
-  $("btnBatchRun")?.addEventListener("click", runBatch);
-  $("btnBatchExample")?.addEventListener("click", setBatchExample);
+  document.querySelectorAll("[data-hf]").forEach((input) => {
+    input.addEventListener("input", () => {
+      const key = input.getAttribute("data-hf");
+      historyFilters[key] = input.value || "";
+      applyHistoryFiltersDom();
+    });
+  });
+  $("predictRowsBody")?.addEventListener("click", (e) => {
+    const tr = e.target?.closest?.("tr[data-predict-row]");
+    if (!tr) return;
+    const idx = Number(tr.getAttribute("data-predict-row"));
+    if (!Number.isFinite(idx)) return;
+    openPatientCardFromPredictRow(idx);
+  });
 
   loadRole();
+  initHistorySorting();
+  loadHistory();
 })();
 </script>
 </body>

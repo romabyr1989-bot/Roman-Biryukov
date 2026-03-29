@@ -5,7 +5,6 @@
 #include <arpa/inet.h>
 #include <cjson/cJSON.h>
 
-#include "predict.h"
 #include "predictor.h"
 #include "json_io.h"   // Чтение файлов для отдачи HTML
 #include "db.h"
@@ -72,33 +71,21 @@ void send_response(int client, const char *status, const char *type, const char 
     free(response);
 }
 
-/* ===== ОБРАБОТЧИКИ ===== */
-void handle_predict(int client, char *body) {
-
-    char result[1024];
+static void handle_predict_route(int client, char *body) {
+    char result[8192];
 
     if (!body || run_prediction(body, result, sizeof(result)) != 0) {
         send_response(client, "400 Bad Request", "text/plain", "Error");
         return;
     }
 
-    /* Ошибка сохранения в БД не должна ломать ответ пользователю. */
-    db_save_prediction(body, result);
+    /* /predict только считает прогноз; сохранение выполняется отдельным маршрутом /save. */
     send_response(client, "200 OK", "application/json", result);
 }
 
-void handle_batch(int client, char *body) {
-
-    char result[4096];
-
-    if (!body || run_batch(body, result, sizeof(result)) != 0) {
-        send_response(client, "400 Bad Request", "text/plain", "Error");
-        return;
-    }
-
-    /* Ошибка сохранения в БД не должна ломать ответ пользователю. */
-    db_save_batch(body, result);
-    send_response(client, "200 OK", "application/json", result);
+/* ===== ОБРАБОТЧИКИ ===== */
+void handle_predict(int client, char *body) {
+    handle_predict_route(client, body);
 }
 
 void handle_save(int client, char *body) {
@@ -117,7 +104,7 @@ void handle_save(int client, char *body) {
     cJSON *input = cJSON_GetObjectItem(root, "input");
     cJSON *output = cJSON_GetObjectItem(root, "output");
 
-    if (!input || !output || !cJSON_IsObject(input) || !cJSON_IsObject(output)) {
+    if (!input || !output) {
         cJSON_Delete(root);
         send_response(client, "400 Bad Request", "text/plain", "Invalid payload");
         return;
@@ -140,7 +127,12 @@ void handle_save(int client, char *body) {
     free(output_json);
     cJSON_Delete(root);
 
-    if (rc != 0) {
+    if (rc == DB_DUPLICATE) {
+        send_response(client, "409 Conflict", "text/plain", "Duplicate patient_id or record");
+        return;
+    }
+
+    if (rc != DB_OK) {
         send_response(client, "500 Internal Server Error", "text/plain", "DB error");
         return;
     }
@@ -223,11 +215,6 @@ int main() {
         /* ===== МАРШРУТ /predict ===== */
         else if (!strcmp(method, "POST") && !strcmp(path, "/predict")) {
             handle_predict(client_socket, body);
-        }
-
-        /* ===== МАРШРУТ /batch ===== */
-        else if (!strcmp(method, "POST") && !strcmp(path, "/batch")) {
-            handle_batch(client_socket, body);
         }
 
         /* ===== МАРШРУТ /save ===== */

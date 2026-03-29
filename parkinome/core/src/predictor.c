@@ -6,7 +6,7 @@
 #include "predict.h"
 
 /* ===== ПАРСЕР ===== */
-int parse_patient(cJSON *json, parkinome_input_t *in) {
+static int parse_patient(cJSON *json, parkinome_input_t *in) {
 
     if (!json || !in) return PARKINOME_NULL_POINTER;
 
@@ -24,7 +24,7 @@ int parse_patient(cJSON *json, parkinome_input_t *in) {
     /* Копируем только поля, которые есть в JSON, и выставляем флаги has_* для модели. */
     #define SET_FIELD(name) { \
         cJSON *item = cJSON_GetObjectItem(json, #name); \
-        if (item) { \
+        if (item && cJSON_IsNumber(item)) { \
             in->name = item->valuedouble; \
             in->has_##name = 1; \
         } \
@@ -44,94 +44,135 @@ int parse_patient(cJSON *json, parkinome_input_t *in) {
     SET_FIELD(il1b);
     SET_FIELD(s100a8);
     SET_FIELD(cxcl8);
+    #undef SET_FIELD
 
     return PARKINOME_OK;
 }
 
-/* ===== ОДИН ПАЦИЕНТ ===== */
-/* Разбираем JSON одного пациента и формируем компактный JSON-ответ. */
-int run_prediction(const char *body, char *result, size_t size) {
-
-    cJSON *json = cJSON_Parse(body);
-    if (!json) return 1;
-
+static int append_prediction(cJSON *patient, cJSON *patients_out) {
     parkinome_input_t in = {0};
     parkinome_output_t out = {0};
+    cJSON *row = NULL;
+    const char *cat = NULL;
 
-    if (parse_patient(json, &in) != 0) {
-        cJSON_Delete(json);
+    if (parse_patient(patient, &in) != 0) {
         return 1;
     }
-
-    cJSON_Delete(json);
 
     if (parkinome_predict(&in, &out) != PARKINOME_OK) {
         return 1;
     }
 
-    const char *cat =
+    cat =
         (out.category == 0) ? "LOW" :
         (out.category == 1) ? "INTERMEDIATE" :
                               "HIGH";
 
-    if (in.has_patient_id) {
-        snprintf(result, size,
-            "{ \"patient_id\": \"%s\", \"isp\": %.3f, \"risk_probability\": %.3f, \"category\": \"%s\", \"confidence\": %.2f }",
-            in.patient_id,
-            out.isp,
-            out.risk_probability,
-            cat,
-            out.confidence
-        );
-    } else {
-        snprintf(result, size,
-            "{ \"isp\": %.3f, \"risk_probability\": %.3f, \"category\": \"%s\", \"confidence\": %.2f }",
-            out.isp,
-            out.risk_probability,
-            cat,
-            out.confidence
-        );
-    }
+    row = cJSON_CreateObject();
+    if (!row) return 1;
 
+    if (in.has_patient_id) {
+        cJSON_AddStringToObject(row, "patient_id", in.patient_id);
+    }
+    cJSON_AddNumberToObject(row, "isp", out.isp);
+    cJSON_AddNumberToObject(row, "risk_probability", out.risk_probability);
+    cJSON_AddStringToObject(row, "category", cat);
+    cJSON_AddNumberToObject(row, "confidence", out.confidence);
+
+    cJSON_AddItemToArray(patients_out, row);
     return 0;
 }
 
-/* ===== БАТЧ ===== */
-/* Обрабатываем массив: некорректные записи пропускаем, валидные добавляем в ответ. */
-int run_batch(const char *body, char *result, size_t size) {
+/* ===== ДИНАМИЧЕСКИЙ ВХОД ===== */
+/* Принимает:
+ * - объект пациента;
+ * - массив пациентов;
+ * - объект вида { "patients": [...] }.
+ * Всегда возвращает единый JSON-формат:
+ * { "count": N, "patients": [ ... ] } */
+int run_prediction(const char *body, char *result, size_t size) {
+    cJSON *root = NULL;
+    cJSON *patients_in = NULL;
+    cJSON *out = NULL;
+    cJSON *patients_out = NULL;
+    char *serialized = NULL;
+    int count = 0;
 
-    cJSON *array = cJSON_Parse(body);
-    if (!array || !cJSON_IsArray(array)) return 1;
+    if (!body || !result || size == 0) return 1;
 
-    char buffer[4096] = "[";
-    int first = 1;
+    root = cJSON_Parse(body);
+    if (!root) return 1;
 
-    for (int i = 0; i < cJSON_GetArraySize(array); i++) {
-
-        cJSON *item = cJSON_GetArrayItem(array, i);
-
-        char res[512];
-
-        char *str = cJSON_PrintUnformatted(item);
-        if (!str) continue;
-
-        if (run_prediction(str, res, sizeof(res)) != 0) {
-            free(str);
-            continue;
+    if (cJSON_IsObject(root)) {
+        patients_in = cJSON_GetObjectItem(root, "patients");
+        if (patients_in && !cJSON_IsArray(patients_in)) {
+            cJSON_Delete(root);
+            return 1;
         }
-
-        free(str);
-
-        if (!first) strcat(buffer, ",");
-        strcat(buffer, res);
-
-        first = 0;
+    } else if (!cJSON_IsArray(root)) {
+        cJSON_Delete(root);
+        return 1;
     }
 
-    strcat(buffer, "]");
+    out = cJSON_CreateObject();
+    patients_out = cJSON_CreateArray();
+    if (!out || !patients_out) {
+        if (out) cJSON_Delete(out);
+        if (patients_out) cJSON_Delete(patients_out);
+        cJSON_Delete(root);
+        return 1;
+    }
 
-    strncpy(result, buffer, size);
+    cJSON_AddItemToObject(out, "patients", patients_out);
 
-    cJSON_Delete(array);
+    if (!patients_in && cJSON_IsObject(root)) {
+        /* Одиночный объект пациента */
+        if (append_prediction(root, patients_out) != 0) {
+            cJSON_Delete(out);
+            cJSON_Delete(root);
+            return 1;
+        }
+    } else {
+        /* Массив пациентов: считаем прогноз для каждого элемента. */
+        cJSON *source = patients_in ? patients_in : root;
+        int n = cJSON_GetArraySize(source);
+        if (n <= 0) {
+            cJSON_Delete(out);
+            cJSON_Delete(root);
+            return 1;
+        }
+        for (int i = 0; i < n; i++) {
+            cJSON *item = cJSON_GetArrayItem(source, i);
+            if (!item || !cJSON_IsObject(item) || append_prediction(item, patients_out) != 0) {
+                cJSON_Delete(out);
+                cJSON_Delete(root);
+                return 1;
+            }
+        }
+    }
+
+    count = cJSON_GetArraySize(patients_out);
+    cJSON_AddNumberToObject(out, "count", count);
+
+    serialized = cJSON_PrintUnformatted(out);
+    if (!serialized) {
+        cJSON_Delete(out);
+        cJSON_Delete(root);
+        return 1;
+    }
+
+    if (strlen(serialized) >= size) {
+        free(serialized);
+        cJSON_Delete(out);
+        cJSON_Delete(root);
+        return 1;
+    }
+
+    strncpy(result, serialized, size);
+    result[size - 1] = '\0';
+
+    free(serialized);
+    cJSON_Delete(out);
+    cJSON_Delete(root);
     return 0;
 }
