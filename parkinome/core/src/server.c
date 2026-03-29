@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
 #include <arpa/inet.h>
 #include <cjson/cJSON.h>
 
@@ -11,6 +12,7 @@
 
 #define PORT 8080
 #define BUFFER_SIZE 8192
+#define MAX_REQUEST_SIZE (2 * 1024 * 1024)
 
 static char* read_ui_file(void) {
     const char *candidates[] = {
@@ -36,6 +38,86 @@ static int write_all(int fd, const char *data, size_t len) {
         if (n <= 0) return -1;
         sent += (size_t)n;
     }
+    return 0;
+}
+
+static int parse_content_length(const char *request) {
+    const char *p = NULL;
+    if (!request) return 0;
+    p = strstr(request, "Content-Length:");
+    if (!p) p = strstr(request, "content-length:");
+    if (!p) return 0;
+    p += 15;
+    while (*p == ' ' || *p == '\t') p++;
+    int n = atoi(p);
+    return (n > 0) ? n : 0;
+}
+
+/* Читает полный HTTP-запрос с учетом Content-Length. Caller освобождает *out_buf. */
+static int read_http_request(int client, char **out_buf, int *out_len) {
+    int total = 0;
+    int cap = BUFFER_SIZE;
+    int content_len = -1;
+    int expected_total = -1;
+    char *buf = NULL;
+    char *hdr_end = NULL;
+
+    if (!out_buf || !out_len) return -1;
+    *out_buf = NULL;
+    *out_len = 0;
+
+    buf = malloc((size_t)cap + 1);
+    if (!buf) return -1;
+
+    while (1) {
+        int space = cap - total;
+        int n;
+        if (space <= 0) {
+            if (cap >= MAX_REQUEST_SIZE) {
+                free(buf);
+                return -1;
+            }
+            cap *= 2;
+            if (cap > MAX_REQUEST_SIZE) cap = MAX_REQUEST_SIZE;
+            char *grown = realloc(buf, (size_t)cap + 1);
+            if (!grown) {
+                free(buf);
+                return -1;
+            }
+            buf = grown;
+            space = cap - total;
+        }
+
+        n = (int)read(client, buf + total, (size_t)space);
+        if (n <= 0) break;
+        total += n;
+        buf[total] = '\0';
+
+        if (expected_total < 0) {
+            hdr_end = strstr(buf, "\r\n\r\n");
+            if (hdr_end) {
+                int header_len = (int)(hdr_end - buf) + 4;
+                content_len = parse_content_length(buf);
+                expected_total = header_len + content_len;
+                if (expected_total < header_len) {
+                    free(buf);
+                    return -1;
+                }
+                if (expected_total == header_len) break;
+            }
+        }
+
+        if (expected_total >= 0 && total >= expected_total) break;
+    }
+
+    if (total <= 0) {
+        free(buf);
+        return -1;
+    }
+
+    buf[total] = '\0';
+    *out_buf = buf;
+    *out_len = total;
     return 0;
 }
 
@@ -147,20 +229,39 @@ int main() {
     struct sockaddr_in address;
     int addrlen = sizeof(address);
 
-    char buffer[BUFFER_SIZE];
-
     if (db_init() != 0) {
         fprintf(stderr, "Ошибка инициализации БД\n");
     }
 
     server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_fd < 0) {
+        perror("socket");
+        return 1;
+    }
+
+    {
+        int yes = 1;
+        if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) < 0) {
+            perror("setsockopt");
+            close(server_fd);
+            return 1;
+        }
+    }
 
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
     address.sin_port = htons(PORT);
 
-    bind(server_fd, (struct sockaddr *)&address, sizeof(address));
-    listen(server_fd, 10);
+    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
+        perror("bind");
+        close(server_fd);
+        return 1;
+    }
+    if (listen(server_fd, 10) < 0) {
+        perror("listen");
+        close(server_fd);
+        return 1;
+    }
 
     printf("🚀 Server running on http://localhost:%d\n", PORT);
 
@@ -170,14 +271,18 @@ int main() {
                                (struct sockaddr *)&address,
                                (socklen_t*)&addrlen);
 
-        int valread = read(client_socket, buffer, sizeof(buffer) - 1);
-
-        if (valread <= 0) {
-            close(client_socket);
+        if (client_socket < 0) {
+            if (errno == EINTR) continue;
+            perror("accept");
             continue;
         }
 
-        buffer[valread] = '\0';
+        char *buffer = NULL;
+        int req_len = 0;
+        if (read_http_request(client_socket, &buffer, &req_len) != 0) {
+            close(client_socket);
+            continue;
+        }
 
         char method[8], path[64];
         sscanf(buffer, "%s %s", method, path);
@@ -237,6 +342,7 @@ int main() {
             send_response(client_socket, "404 Not Found", "text/plain", "Not Found");
         }
 
+        free(buffer);
         close(client_socket);
     }
 

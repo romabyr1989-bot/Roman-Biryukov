@@ -14,7 +14,7 @@
   --line: #d2d2d7;
   --accent: #0071e3;
   --accent-hover: #0077ed;
-  --soft-shadow: 0 8px 28px rgba(0, 0, 0, 0.06);
+  --soft-shadow: 0 10px 34px rgba(0, 0, 0, 0.07);
   --warn: #b47f00;
   --high: #cc1f1f;
   --ok: #2f7b22;
@@ -27,7 +27,9 @@ body {
   min-height: 100vh;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif;
   color: var(--text);
-  background: var(--bg);
+  background: radial-gradient(1200px 500px at 50% -150px, #ffffff 0%, var(--bg) 60%);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 .page {
@@ -45,7 +47,7 @@ body {
   position: relative;
   padding: 8px 8px 6px;
   text-align: center;
-  border-bottom: 1px solid #e5e5ea;
+  border-bottom: 1px solid #e8e8ed;
 }
 
 .brand {
@@ -109,10 +111,11 @@ select {
 .panel {
   border: 1px solid #e5e5ea;
   border-radius: 24px;
-  background: var(--panel);
+  background: linear-gradient(180deg, #ffffff 0%, #fbfbfd 100%);
   padding: 12px;
   box-shadow: var(--soft-shadow);
   height: 100%;
+  backdrop-filter: saturate(120%) blur(3px);
 }
 
 .hidden { display: none !important; }
@@ -164,6 +167,7 @@ textarea {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  align-items: center;
 }
 
 button {
@@ -173,7 +177,7 @@ button {
   font: inherit;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease, transform 140ms ease, box-shadow 180ms ease;
+  transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease, transform 140ms ease, box-shadow 180ms ease, filter 180ms ease;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -207,6 +211,7 @@ button {
   background: #f7f7f8;
   border-color: #c7c7cc;
   transform: translateY(-1px);
+  filter: saturate(110%);
 }
 
 .btn-ghost:active {
@@ -320,7 +325,7 @@ button:focus-visible {
   min-width: 0;
   border: 1px solid var(--line);
   background: #fff;
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 6px;
   font: inherit;
   font-size: 12px;
@@ -337,11 +342,12 @@ button:focus-visible {
   border: 1px solid var(--line);
   border-radius: 16px;
   overflow: hidden;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .history-table th,
 .history-table td {
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid #ececf0;
   padding: 8px;
   text-align: left;
   vertical-align: top;
@@ -356,6 +362,13 @@ button:focus-visible {
   letter-spacing: 0.04em;
   font-weight: 600;
   background: #fbfbfd;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.history-table tbody tr:hover td {
+  background: #fafaff;
 }
 
 .history-table tr:last-child td {
@@ -382,9 +395,13 @@ button:focus-visible {
 
 .mini-table th,
 .mini-table td {
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid #ececf0;
   padding: 8px;
   text-align: left;
+}
+
+.mini-table tbody tr:hover td {
+  background: #fafaff;
 }
 
 .mini-table tr:last-child td {
@@ -394,7 +411,7 @@ button:focus-visible {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(29, 29, 31, 0.48);
+  background: rgba(29, 29, 31, 0.42);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -408,7 +425,7 @@ button:focus-visible {
   overflow: auto;
   border: 1px solid #e5e5ea;
   border-radius: 24px;
-  background: var(--panel-strong);
+  background: linear-gradient(180deg, #ffffff 0%, #fbfbfd 100%);
   padding: 22px;
   box-shadow: 0 22px 56px rgba(0, 0, 0, 0.22);
 }
@@ -430,6 +447,10 @@ button:focus-visible {
   font-size: 20px;
   line-height: 1;
   cursor: pointer;
+}
+
+.modal-x:hover {
+  background: #ebebf0;
 }
 
 @media (max-width: 920px) {
@@ -650,10 +671,38 @@ button:focus-visible {
   function parsePatientsCsv(text) {
     const rows = String(text || "").split(/\r?\n/).filter((line) => line.trim());
     if (rows.length < 2) return [];
-    const headers = rows[0].split(",").map((h) => normalizeFieldKey(h.replace(/^"|"$/g, "")));
+    const headerLine = rows[0];
+    const delimiter = (headerLine.split(";").length > headerLine.split(",").length) ? ";" : ",";
+    const parseCsvLine = (line) => {
+      const out = [];
+      let cur = "";
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === "\"") {
+          if (inQuotes && line[i + 1] === "\"") {
+            cur += "\"";
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+          continue;
+        }
+        if (ch === delimiter && !inQuotes) {
+          out.push(cur.trim());
+          cur = "";
+          continue;
+        }
+        cur += ch;
+      }
+      out.push(cur.trim());
+      return out;
+    };
+
+    const headers = parseCsvLine(headerLine).map((h) => normalizeFieldKey(h.replace(/^"|"$/g, "")));
     const patients = [];
     for (let i = 1; i < rows.length; i++) {
-      const cols = rows[i].split(",").map((v) => v.replace(/^"|"$/g, "").trim());
+      const cols = parseCsvLine(rows[i]).map((v) => v.replace(/^"|"$/g, "").trim());
       const raw = {};
       headers.forEach((h, idx) => { raw[h] = cols[idx] ?? ""; });
       const p = parsePatientObject(raw);
@@ -850,15 +899,6 @@ button:focus-visible {
     if (col === "isp" && typeof v === "number") return v.toFixed(3);
     if (v === null || v === undefined) return "";
     return String(v);
-  }
-
-  function passesHistoryFilters(row) {
-    for (const col of historyColumns) {
-      const q = (historyFilters[col] || "").trim().toLowerCase();
-      if (!q) continue;
-      if (!historyValue(row, col).toLowerCase().includes(q)) return false;
-    }
-    return true;
   }
 
   function compareHistoryRows(a, b, key, dir) {

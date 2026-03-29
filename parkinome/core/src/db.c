@@ -13,6 +13,8 @@
 #define DB_FILE "data/parkinome.db"
 #define DB_FILE_ALT "parkinome/core/data/parkinome.db"
 
+/* Открывает единый файл БД независимо от cwd.
+   Приоритет: рядом с бинарником -> legacy пути. */
 static int open_db(sqlite3 **db) {
     char exe_path[PATH_MAX];
     char exe_dir[PATH_MAX];
@@ -51,6 +53,7 @@ static char* normalize_patient_id(const char *raw) {
     len = strlen(raw);
     if (len == 0) return NULL;
 
+    /* Удаляем только внешние пробелы, внутренние символы сохраняем как есть. */
     while (start < len && (raw[start] == ' ' || raw[start] == '\t' || raw[start] == '\n' || raw[start] == '\r')) start++;
     if (start == len) return NULL;
     end = len - 1;
@@ -222,7 +225,9 @@ int db_init(void) {
         ");",
         NULL, NULL, NULL);
 
-    /* Жесткие ограничения от дублей. */
+    /* Жесткие ограничения от дублей:
+       - patient_id уникален (без учета регистра);
+       - одинаковые пары input/output запрещены. */
     if (sqlite3_exec(db,
         "CREATE UNIQUE INDEX IF NOT EXISTS ux_predictions_patient_id "
         "ON predictions(patient_id COLLATE NOCASE) WHERE patient_id IS NOT NULL;",
@@ -256,6 +261,7 @@ int db_save_prediction(const char *input_json, const char *output_json) {
         return DB_ERR;
     }
 
+    /* Для batch payload patient_id == NULL: проверка уникальности идет только по payload. */
     patient_id = extract_patient_id(input_json);
     if (patient_id) {
         char *normalized = normalize_patient_id(patient_id);
@@ -263,7 +269,7 @@ int db_save_prediction(const char *input_json, const char *output_json) {
         patient_id = normalized;
     }
 
-    /* Запрещаем запись с уже существующим patient_id. */
+    /* Запрещаем запись с уже существующим patient_id (case-insensitive). */
     if (patient_id) {
         const char *check_pid_sql = "SELECT 1 FROM predictions WHERE patient_id = ? COLLATE NOCASE LIMIT 1;";
         if (sqlite3_prepare_v2(db, check_pid_sql, -1, &check_stmt, NULL) != SQLITE_OK) {
@@ -282,7 +288,7 @@ int db_save_prediction(const char *input_json, const char *output_json) {
         check_stmt = NULL;
     }
 
-    /* Запрещаем дубликат записи (одинаковый input+output). */
+    /* Запрещаем дубликат записи (одинаковые input_json + output_json). */
     {
         const char *check_payload_sql =
             "SELECT 1 FROM predictions WHERE input_json = ? AND output_json = ? LIMIT 1;";
