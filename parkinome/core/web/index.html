@@ -826,6 +826,25 @@ button:focus-visible {
     `;
   }
 
+  /* Подстраховка на UI: если бэкенд не прислал breakdown, рассчитываем простой вариант сами. */
+  function synthesizeBreakdown(row) {
+    if (!row || typeof row !== "object") return null;
+    const risk = Number(row.risk_probability);
+    const inflam = Number(row.inflam_score);
+    const mito = Number(row.mito_score);
+    const imb = Number(row.imbalance);
+    if (!Number.isFinite(risk) && !Number.isFinite(inflam) && !Number.isFinite(mito) && !Number.isFinite(imb)) return null;
+    /* Простая эвристика на случай, если backend не прислал breakdown: 
+       используем risk и биомаркеры, как в inlineDetail fallback. */
+    return {
+      clinical: Number.isFinite(risk) ? (risk - 0.5) : 0,
+      cognitive: 0,
+      inflammation: Number.isFinite(inflam) ? inflam * 0.15 : 0,
+      mitochondrial: Number.isFinite(mito) ? -mito * 0.12 : 0,
+      imbalance: Number.isFinite(imb) ? imb * 0.18 : 0
+    };
+  }
+
   function setPredictSummary(row) {
     const risk = Number(row?.risk_probability);
     const conf = Number(row?.confidence);
@@ -840,8 +859,9 @@ button:focus-visible {
       ? `${inflam.toFixed(3)} / ${imb.toFixed(3)}`
       : "-";
 
-    renderRiskOverview(row);
-    renderBreakdown(row?.breakdown || null);
+    const breakdown = row?.breakdown || synthesizeBreakdown(row);
+    renderRiskOverview(row, breakdown);
+    renderBreakdown(breakdown || null, row);
     renderIndices(row?.indices || null, row?.levels || null);
     renderGenes(row?.genes || null);
   }
@@ -852,7 +872,7 @@ button:focus-visible {
     return "high";
   }
 
-  function renderRiskOverview(row) {
+  function renderRiskOverview(row, breakdownOverride = null) {
     const risk = Number(row?.risk_probability);
     const cat = row?.category || "-";
     const hero = $("riskHero");
@@ -865,7 +885,7 @@ button:focus-visible {
       hero.classList.add(categoryClass(cat));
     }
 
-    const b = row?.breakdown || {};
+    const b = breakdownOverride || row?.breakdown || synthesizeBreakdown(row) || {};
     const infl = Number(b.inflammation || 0);
     const clin = Number(b.clinical || 0);
     const mito = Number(b.mitochondrial || 0);
@@ -875,17 +895,19 @@ button:focus-visible {
     if (clin > 0.05) parts.push("clinical severity");
     if (cog > 0.05) parts.push("cognitive deficit");
     if (mito < -0.05) parts.push("mitochondrial profile is partially protective");
-    text.innerText = parts.length
-      ? `Risk signal is driven by ${parts.join(", ")}.`
-      : "No dominant driver detected for this profile.";
+    text.innerText = interpretationText(row, b);
   }
 
-  function renderBreakdown(breakdown) {
+  function renderBreakdown(breakdown, rowForFallback = null) {
     const host = $("breakdownBars");
     if (!host) return;
     if (!breakdown || typeof breakdown !== "object") {
-      host.innerHTML = `<div style="font-size:13px; color:var(--muted);">No breakdown data.</div>`;
-      return;
+      const fallback = rowForFallback ? synthesizeBreakdown(rowForFallback) : null;
+      if (!fallback) {
+        host.innerHTML = `<div style="font-size:13px; color:var(--muted);">No breakdown data.</div>`;
+        return;
+      }
+      breakdown = fallback;
     }
     const rows = [
       ["clinical", "Clinical", Number(breakdown.clinical || 0)],
@@ -948,6 +970,31 @@ button:focus-visible {
     return "HIGH";
   }
 
+  /* Генерация человекочитаемого текста интерпретации из категории риска и драйверов. */
+  function interpretationText(row, breakdownMaybe) {
+    const cat = rowRiskCategory(row);
+    const risk = Number(row?.risk_probability);
+    const b = breakdownMaybe || row?.breakdown || synthesizeBreakdown(row) || {};
+
+    const drivers = [];
+    if (Number(b.inflammation) > 0.3) drivers.push("inflammation");
+    if (Number(b.clinical) > 0.3) drivers.push("clinical severity");
+    if (Number(b.cognitive) > 0.3) drivers.push("cognitive deficit");
+    if (Number(b.mitochondrial) < -0.3) drivers.push("mitochondrial protection");
+    if (Number(b.imbalance) > 0.3) drivers.push("stress/imbalance");
+
+    let base = "Profile needs review.";
+    if (cat === "HIGH") base = "High-risk profile; prioritize clinical review and mitigation.";
+    else if (cat === "INTERMEDIATE") base = "Intermediate profile; monitor trend and key drivers.";
+    else if (cat === "LOW") base = "Lower risk profile; continue observation.";
+
+    const driverText = drivers.length ? ` Key drivers: ${drivers.join(", ")}.` : "";
+    const conf = Number(row?.confidence);
+    const confText = Number.isFinite(conf) ? ` Confidence ${conf.toFixed(2)}.` : "";
+    const riskText = Number.isFinite(risk) ? ` Risk ${(risk * 100).toFixed(0)}%.` : "";
+    return `${base}${riskText}${driverText}${confText}`.trim();
+  }
+
   function inlineDetailHtml(row) {
     const risk = Number(row?.risk_probability);
     const category = rowRiskCategory(row);
@@ -965,14 +1012,21 @@ button:focus-visible {
       Number.isFinite(mito) ? -mito * 0.12 : 0,
       Number.isFinite(imb) ? imb * 0.18 : 0
     ];
+    const bd = (row && typeof row.breakdown === "object")
+      ? row.breakdown
+      : synthesizeBreakdown(row);
     const breakdown = [
-      ["Clinical", Number.isFinite(Number(row?.breakdown_clinical)) ? Number(row.breakdown_clinical) : fallback[0]],
-      ["Cognitive", Number.isFinite(Number(row?.breakdown_cognitive)) ? Number(row.breakdown_cognitive) : fallback[1]],
-      ["Inflammation", Number.isFinite(Number(row?.breakdown_inflammation)) ? Number(row.breakdown_inflammation) : fallback[2]],
-      ["Mitochondrial", Number.isFinite(Number(row?.breakdown_mitochondrial)) ? Number(row.breakdown_mitochondrial) : fallback[3]],
-      ["Imbalance", Number.isFinite(Number(row?.breakdown_imbalance)) ? Number(row.breakdown_imbalance) : fallback[4]]
+      ["Clinical", Number.isFinite(Number(bd?.clinical)) ? Number(bd?.clinical) : fallback[0]],
+      ["Cognitive", Number.isFinite(Number(bd?.cognitive)) ? Number(bd?.cognitive) : fallback[1]],
+      ["Inflammation", Number.isFinite(Number(bd?.inflammation)) ? Number(bd?.inflammation) : fallback[2]],
+      ["Mitochondrial", Number.isFinite(Number(bd?.mitochondrial)) ? Number(bd?.mitochondrial) : fallback[3]],
+      ["Imbalance", Number.isFinite(Number(bd?.imbalance)) ? Number(bd?.imbalance) : fallback[4]]
     ];
-    const maxAbs = Math.max(0.1, ...breakdown.map((x) => Math.abs(x[1])));
+    const maxAbs = Math.max(0.1, ...breakdown.map((x) => {
+      const v = Number.isFinite(x[1]) ? x[1] : 0;
+      return Math.abs(v);
+    }));
+    const interp = interpretationText(row, bd) || "No interpretation available.";
     return `
       <div class="history-detail-wrap">
         <div class="viz-grid" style="margin-top:0;">
@@ -987,7 +1041,7 @@ button:focus-visible {
               ${breakdown.map(([name, v]) => `
                 <div class="contrib-row">
                   <div class="contrib-k">${name}</div>
-                  <div class="contrib-track"><div class="contrib-bar ${v >= 0 ? "pos" : "neg"}" style="width:${Math.min(100, (Math.abs(v) / maxAbs) * 100)}%"></div></div>
+                  <div class="contrib-track"><div class="contrib-bar ${v >= 0 ? "pos" : "neg"}" style="width:${Number.isFinite(v) ? Math.min(100, (Math.abs(v) / maxAbs) * 100) : 0}%"></div></div>
                   <div style="font-size:12px; text-align:right;">${Number.isFinite(v) ? v.toFixed(2) : "-"}</div>
                 </div>
               `).join("")}
@@ -1012,11 +1066,7 @@ button:focus-visible {
           </div>
           <div class="viz-card">
             <div class="summary-k">Interpretation</div>
-            <div style="margin-top:8px; font-size:13px; color:var(--muted);">
-              ${category === "HIGH" ? "High-risk profile; clinical and inflammatory burden should be reviewed first."
-                : category === "INTERMEDIATE" ? "Intermediate profile; monitor trend and key drivers over time."
-                : "Lower risk profile; maintain follow-up and observe changes in biomarkers."}
-            </div>
+            <div style="margin-top:8px; font-size:13px; color:var(--text); line-height:1.5;">${interp}</div>
           </div>
         </div>
       </div>
@@ -1452,7 +1502,7 @@ button:focus-visible {
     for (const row of uniqueRows) {
       if (hasFlatHistoryFields(row)) {
         const b = parseBreakdownFromOutputJson(row.output_json);
-        normalizedRows.push({
+        const normRow = {
           id: row.id ?? null,
           patient_id: row.patient_id ?? null,
           age: row.age ?? null,
@@ -1481,7 +1531,9 @@ button:focus-visible {
           breakdown_mitochondrial: (typeof b?.mitochondrial === "number") ? b.mitochondrial : null,
           breakdown_imbalance: (typeof b?.imbalance === "number") ? b.imbalance : null,
           created_at: row.created_at ?? null
-        });
+        };
+        normRow.breakdown = b || synthesizeBreakdown(normRow);
+        normalizedRows.push(normRow);
         continue;
       }
 
@@ -1496,7 +1548,7 @@ button:focus-visible {
         const pid = input.patient_id || out.patient_id || row.patient_id || "-";
         const breakdown = (out && typeof out.breakdown === "object") ? out.breakdown : {};
 
-        normalizedRows.push({
+        const normRow = {
           id: row.id ?? null,
           patient_id: pid,
           age: input.age ?? null,
@@ -1525,7 +1577,9 @@ button:focus-visible {
           breakdown_mitochondrial: (typeof breakdown.mitochondrial === "number") ? breakdown.mitochondrial : null,
           breakdown_imbalance: (typeof breakdown.imbalance === "number") ? breakdown.imbalance : null,
           created_at: row.created_at ?? null
-        });
+        };
+        normRow.breakdown = (out && typeof out.breakdown === "object") ? out.breakdown : synthesizeBreakdown(normRow);
+        normalizedRows.push(normRow);
       }
     }
 
