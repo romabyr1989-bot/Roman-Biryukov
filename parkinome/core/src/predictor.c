@@ -5,6 +5,18 @@
 
 #include "predict.h"
 
+static const char *risk_category_str(int category) {
+    return (category == 0) ? "LOW" :
+           (category == 1) ? "INTERMEDIATE" :
+                             "HIGH";
+}
+
+static const char *level_str(int level) {
+    return (level == 0) ? "LOW" :
+           (level == 1) ? "INTERMEDIATE" :
+                          "HIGH";
+}
+
 /* ===== ПАРСЕР ===== */
 static int parse_patient(cJSON *json, parkinome_input_t *in) {
 
@@ -54,6 +66,10 @@ static int append_prediction(cJSON *patient, cJSON *patients_out) {
     parkinome_output_t out = {0};
     cJSON *row = NULL;
     const char *cat = NULL;
+    cJSON *breakdown = NULL;
+    cJSON *indices = NULL;
+    cJSON *levels = NULL;
+    cJSON *genes = NULL;
 
     if (parse_patient(patient, &in) != 0) {
         return 1;
@@ -63,10 +79,7 @@ static int append_prediction(cJSON *patient, cJSON *patients_out) {
         return 1;
     }
 
-    cat =
-        (out.category == 0) ? "LOW" :
-        (out.category == 1) ? "INTERMEDIATE" :
-                              "HIGH";
+    cat = risk_category_str(out.category);
 
     row = cJSON_CreateObject();
     if (!row) return 1;
@@ -78,6 +91,50 @@ static int append_prediction(cJSON *patient, cJSON *patients_out) {
     cJSON_AddNumberToObject(row, "risk_probability", out.risk_probability);
     cJSON_AddStringToObject(row, "category", cat);
     cJSON_AddNumberToObject(row, "confidence", out.confidence);
+    /* Новые биологические индексы для downstream-аналитики/UI. */
+    cJSON_AddNumberToObject(row, "mito_score", out.mito_score);
+    cJSON_AddNumberToObject(row, "inflam_score", out.inflam_score);
+    cJSON_AddNumberToObject(row, "imbalance", out.imbalance);
+
+    /* UI-friendly structured blocks for interpretability. */
+    breakdown = cJSON_CreateObject();
+    indices = cJSON_CreateObject();
+    levels = cJSON_CreateObject();
+    genes = cJSON_CreateObject();
+    if (!breakdown || !indices || !levels || !genes) {
+        if (breakdown) cJSON_Delete(breakdown);
+        if (indices) cJSON_Delete(indices);
+        if (levels) cJSON_Delete(levels);
+        if (genes) cJSON_Delete(genes);
+        cJSON_Delete(row);
+        return 1;
+    }
+
+    cJSON_AddNumberToObject(breakdown, "clinical", out.breakdown_clinical);
+    cJSON_AddNumberToObject(breakdown, "cognitive", out.breakdown_cognitive);
+    cJSON_AddNumberToObject(breakdown, "inflammation", out.breakdown_inflammation);
+    cJSON_AddNumberToObject(breakdown, "mitochondrial", out.breakdown_mitochondrial);
+    cJSON_AddNumberToObject(breakdown, "imbalance", out.breakdown_imbalance);
+    cJSON_AddItemToObject(row, "breakdown", breakdown);
+
+    cJSON_AddNumberToObject(indices, "mito", out.mito_index);
+    cJSON_AddNumberToObject(indices, "inflammation", out.inflam_index);
+    cJSON_AddNumberToObject(indices, "stress", out.stress_index);
+    cJSON_AddItemToObject(row, "indices", indices);
+
+    cJSON_AddStringToObject(levels, "mitochondrial", level_str(out.mito_level));
+    cJSON_AddStringToObject(levels, "inflammation", level_str(out.inflam_level));
+    cJSON_AddItemToObject(row, "levels", levels);
+
+    if (in.has_ndufa4l2) cJSON_AddNumberToObject(genes, "ndufa4l2", in.ndufa4l2);
+    if (in.has_ndufs2) cJSON_AddNumberToObject(genes, "ndufs2", in.ndufs2);
+    if (in.has_pink1) cJSON_AddNumberToObject(genes, "pink1", in.pink1);
+    if (in.has_ppargc1a) cJSON_AddNumberToObject(genes, "ppargc1a", in.ppargc1a);
+    if (in.has_nlrp3) cJSON_AddNumberToObject(genes, "nlrp3", in.nlrp3);
+    if (in.has_il1b) cJSON_AddNumberToObject(genes, "il1b", in.il1b);
+    if (in.has_s100a8) cJSON_AddNumberToObject(genes, "s100a8", in.s100a8);
+    if (in.has_cxcl8) cJSON_AddNumberToObject(genes, "cxcl8", in.cxcl8);
+    cJSON_AddItemToObject(row, "genes", genes);
 
     cJSON_AddItemToArray(patients_out, row);
     return 0;

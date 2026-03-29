@@ -12,9 +12,11 @@
 
 ## Active Runtime Modules
 
-- `src/server.c`: HTTP server and route handling.
+- `src/server.c`: HTTP server and route handling (including request-size guard and full body read by `Content-Length`).
 - `src/predictor.c` + `include/predictor.h`: unified JSON parsing (`cJSON`) and prediction adapter.
-- `src/model.c` + `include/predict.h`: risk model and prediction API.
+- `src/model.c` + `include/predict.h`: trainable linear+logistic inference in pure C.
+- `include/model_params.h`: exported model parameters (weights, imputer, scaler, thresholds), no Python runtime needed.
+- `src/db.c` + `include/db.h`: SQLite storage, schema migrations, deduplication, history API payload assembly.
 - `src/json_io.c` + `include/json_io.h`: file read utility for serving `web/index.html`.
 
 ## Legacy Modules
@@ -35,5 +37,6 @@ These files are preserved for reference and possible future reintegration, but a
 1. Client sends HTTP request to `src/server.c`.
 2. `src/server.c` dispatches route (`/`, `/predict`, `/me`, `/save`, `/history`).
 3. `src/predictor.c` parses request JSON and calls `parkinome_predict(...)`.
-4. `src/model.c` computes risk outputs.
-5. `src/server.c` returns JSON or HTML response.
+4. `src/model.c` computes risk outputs using `model_params.h`.
+5. `src/server.c` may persist prediction via `/save` into SQLite (`src/db.c`).
+6. `src/server.c` returns JSON or HTML response.

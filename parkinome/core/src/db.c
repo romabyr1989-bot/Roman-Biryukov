@@ -169,6 +169,147 @@ static char* extract_patient_id(const char *input_json) {
     return normalize_patient_id(tmp);
 }
 
+/* Извлекает агрегированные выходные поля для одиночного пациента.
+   Для batch payload возвращает 0 (колонки остаются NULL). */
+static int extract_output_metrics(
+    const char *output_json,
+    double *risk_probability,
+    double *confidence,
+    double *isp,
+    double *mito_score,
+    double *inflam_score,
+    double *imbalance,
+    char category[32]
+) {
+    cJSON *root = NULL;
+    cJSON *patient_obj = NULL;
+    cJSON *patients = NULL;
+    cJSON *item = NULL;
+
+    if (!output_json) return 0;
+    root = cJSON_Parse(output_json);
+    if (!root) return 0;
+
+    if (cJSON_IsObject(root)) {
+        patients = cJSON_GetObjectItem(root, "patients");
+        if (patients && cJSON_IsArray(patients)) {
+            if (cJSON_GetArraySize(patients) != 1) {
+                cJSON_Delete(root);
+                return 0;
+            }
+            patient_obj = cJSON_GetArrayItem(patients, 0);
+        } else {
+            patient_obj = root;
+        }
+    } else if (cJSON_IsArray(root)) {
+        if (cJSON_GetArraySize(root) != 1) {
+            cJSON_Delete(root);
+            return 0;
+        }
+        patient_obj = cJSON_GetArrayItem(root, 0);
+    }
+
+    if (!patient_obj || !cJSON_IsObject(patient_obj)) {
+        cJSON_Delete(root);
+        return 0;
+    }
+
+    item = cJSON_GetObjectItem(patient_obj, "risk_probability");
+    if (!(item && cJSON_IsNumber(item))) { cJSON_Delete(root); return 0; }
+    *risk_probability = item->valuedouble;
+
+    item = cJSON_GetObjectItem(patient_obj, "confidence");
+    if (!(item && cJSON_IsNumber(item))) { cJSON_Delete(root); return 0; }
+    *confidence = item->valuedouble;
+
+    item = cJSON_GetObjectItem(patient_obj, "isp");
+    if (!(item && cJSON_IsNumber(item))) { cJSON_Delete(root); return 0; }
+    *isp = item->valuedouble;
+
+    item = cJSON_GetObjectItem(patient_obj, "mito_score");
+    if (item && cJSON_IsNumber(item)) *mito_score = item->valuedouble;
+
+    item = cJSON_GetObjectItem(patient_obj, "inflam_score");
+    if (item && cJSON_IsNumber(item)) *inflam_score = item->valuedouble;
+
+    item = cJSON_GetObjectItem(patient_obj, "imbalance");
+    if (item && cJSON_IsNumber(item)) *imbalance = item->valuedouble;
+
+    item = cJSON_GetObjectItem(patient_obj, "category");
+    if (item && cJSON_IsString(item) && item->valuestring) {
+        snprintf(category, 32, "%s", item->valuestring);
+    } else {
+        category[0] = '\0';
+    }
+
+    cJSON_Delete(root);
+    return 1;
+}
+
+/* Заполняет денормализованные колонки метрик для старых записей, где они отсутствуют.
+   Идемпотентно: уже заполненные строки не меняет. */
+static int backfill_output_metrics(sqlite3 *db) {
+    sqlite3_stmt *sel = NULL;
+    sqlite3_stmt *upd = NULL;
+    int rc = SQLITE_OK;
+    const char *sel_sql =
+        "SELECT id, output_json FROM predictions "
+        "WHERE risk_probability IS NULL OR confidence IS NULL OR isp IS NULL "
+        "OR mito_score IS NULL OR inflam_score IS NULL OR imbalance IS NULL;";
+    const char *upd_sql =
+        "UPDATE predictions SET "
+        "risk_probability = ?, category = ?, confidence = ?, isp = ?, "
+        "mito_score = ?, inflam_score = ?, imbalance = ? "
+        "WHERE id = ?;";
+
+    if (sqlite3_prepare_v2(db, sel_sql, -1, &sel, NULL) != SQLITE_OK) return 1;
+    if (sqlite3_prepare_v2(db, upd_sql, -1, &upd, NULL) != SQLITE_OK) {
+        sqlite3_finalize(sel);
+        return 1;
+    }
+
+    while ((rc = sqlite3_step(sel)) == SQLITE_ROW) {
+        int id = sqlite3_column_int(sel, 0);
+        const unsigned char *out_json = sqlite3_column_text(sel, 1);
+        double risk_probability = 0.0, confidence = 0.0, isp = 0.0;
+        double mito_score = 0.0, inflam_score = 0.0, imbalance = 0.0;
+        char category[32] = {0};
+        int ok = extract_output_metrics(
+            out_json ? (const char*)out_json : NULL,
+            &risk_probability, &confidence, &isp,
+            &mito_score, &inflam_score, &imbalance, category
+        );
+        if (!ok) continue; /* batch/битый json пропускаем */
+
+        sqlite3_reset(upd);
+        sqlite3_clear_bindings(upd);
+        sqlite3_bind_double(upd, 1, risk_probability);
+        if (category[0] != '\0') sqlite3_bind_text(upd, 2, category, -1, SQLITE_TRANSIENT);
+        else sqlite3_bind_null(upd, 2);
+        sqlite3_bind_double(upd, 3, confidence);
+        sqlite3_bind_double(upd, 4, isp);
+        sqlite3_bind_double(upd, 5, mito_score);
+        sqlite3_bind_double(upd, 6, inflam_score);
+        sqlite3_bind_double(upd, 7, imbalance);
+        sqlite3_bind_int(upd, 8, id);
+        if (sqlite3_step(upd) != SQLITE_DONE) {
+            sqlite3_finalize(sel);
+            sqlite3_finalize(upd);
+            return 1;
+        }
+    }
+
+    if (rc != SQLITE_DONE) {
+        sqlite3_finalize(sel);
+        sqlite3_finalize(upd);
+        return 1;
+    }
+
+    sqlite3_finalize(sel);
+    sqlite3_finalize(upd);
+    return 0;
+}
+
 int db_init(void) {
     sqlite3 *db = NULL;
 
@@ -184,6 +325,13 @@ int db_init(void) {
         "patient_id TEXT,"
         "input_json TEXT NOT NULL,"
         "output_json TEXT NOT NULL,"
+        "risk_probability REAL,"
+        "category TEXT,"
+        "confidence REAL,"
+        "isp REAL,"
+        "mito_score REAL,"
+        "inflam_score REAL,"
+        "imbalance REAL,"
         "created_at DATETIME DEFAULT CURRENT_TIMESTAMP"
         ");";
 
@@ -194,6 +342,13 @@ int db_init(void) {
 
     /* Для существующих БД добавляем колонку kind (совместимость со старыми файлами БД). */
     sqlite3_exec(db, "ALTER TABLE predictions ADD COLUMN kind TEXT NOT NULL DEFAULT 'prediction';", NULL, NULL, NULL);
+    sqlite3_exec(db, "ALTER TABLE predictions ADD COLUMN risk_probability REAL;", NULL, NULL, NULL);
+    sqlite3_exec(db, "ALTER TABLE predictions ADD COLUMN category TEXT;", NULL, NULL, NULL);
+    sqlite3_exec(db, "ALTER TABLE predictions ADD COLUMN confidence REAL;", NULL, NULL, NULL);
+    sqlite3_exec(db, "ALTER TABLE predictions ADD COLUMN isp REAL;", NULL, NULL, NULL);
+    sqlite3_exec(db, "ALTER TABLE predictions ADD COLUMN mito_score REAL;", NULL, NULL, NULL);
+    sqlite3_exec(db, "ALTER TABLE predictions ADD COLUMN inflam_score REAL;", NULL, NULL, NULL);
+    sqlite3_exec(db, "ALTER TABLE predictions ADD COLUMN imbalance REAL;", NULL, NULL, NULL);
 
     /* Одноразовая миграция из старой таблицы batches в predictions. */
     sqlite3_exec(db,
@@ -244,6 +399,12 @@ int db_init(void) {
         return 1;
     }
 
+    /* Обновляем старые строки: перенос метрик из output_json в отдельные колонки. */
+    if (backfill_output_metrics(db) != 0) {
+        sqlite3_close(db);
+        return 1;
+    }
+
     sqlite3_close(db);
     return 0;
 }
@@ -253,6 +414,14 @@ int db_save_prediction(const char *input_json, const char *output_json) {
     sqlite3_stmt *stmt = NULL;
     sqlite3_stmt *check_stmt = NULL;
     char *patient_id = NULL;
+    double risk_probability = 0.0;
+    double confidence = 0.0;
+    double isp = 0.0;
+    double mito_score = 0.0;
+    double inflam_score = 0.0;
+    double imbalance = 0.0;
+    char category[32] = {0};
+    int has_metrics = 0;
 
     if (!input_json || !output_json) return DB_ERR;
 
@@ -263,6 +432,16 @@ int db_save_prediction(const char *input_json, const char *output_json) {
 
     /* Для batch payload patient_id == NULL: проверка уникальности идет только по payload. */
     patient_id = extract_patient_id(input_json);
+    has_metrics = extract_output_metrics(
+        output_json,
+        &risk_probability,
+        &confidence,
+        &isp,
+        &mito_score,
+        &inflam_score,
+        &imbalance,
+        category
+    );
     if (patient_id) {
         char *normalized = normalize_patient_id(patient_id);
         free(patient_id);
@@ -310,7 +489,10 @@ int db_save_prediction(const char *input_json, const char *output_json) {
     }
 
     const char *sql =
-        "INSERT INTO predictions (patient_id, input_json, output_json) VALUES (?, ?, ?);";
+        "INSERT INTO predictions ("
+        "patient_id, input_json, output_json, "
+        "risk_probability, category, confidence, isp, mito_score, inflam_score, imbalance"
+        ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
 
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
         sqlite3_close(db);
@@ -323,6 +505,13 @@ int db_save_prediction(const char *input_json, const char *output_json) {
 
     sqlite3_bind_text(stmt, 2, input_json, -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(stmt, 3, output_json, -1, SQLITE_TRANSIENT);
+    if (has_metrics) sqlite3_bind_double(stmt, 4, risk_probability); else sqlite3_bind_null(stmt, 4);
+    if (has_metrics && category[0] != '\0') sqlite3_bind_text(stmt, 5, category, -1, SQLITE_TRANSIENT); else sqlite3_bind_null(stmt, 5);
+    if (has_metrics) sqlite3_bind_double(stmt, 6, confidence); else sqlite3_bind_null(stmt, 6);
+    if (has_metrics) sqlite3_bind_double(stmt, 7, isp); else sqlite3_bind_null(stmt, 7);
+    if (has_metrics) sqlite3_bind_double(stmt, 8, mito_score); else sqlite3_bind_null(stmt, 8);
+    if (has_metrics) sqlite3_bind_double(stmt, 9, inflam_score); else sqlite3_bind_null(stmt, 9);
+    if (has_metrics) sqlite3_bind_double(stmt, 10, imbalance); else sqlite3_bind_null(stmt, 10);
 
     int rc = sqlite3_step(stmt);
 
@@ -348,7 +537,9 @@ char* db_get_predictions_json(int limit) {
     }
 
     const char *sql =
-        "SELECT id, patient_id, input_json, output_json, created_at "
+        "SELECT id, patient_id, input_json, output_json, "
+        "risk_probability, category, confidence, isp, mito_score, inflam_score, imbalance, "
+        "created_at "
         "FROM predictions ORDER BY created_at DESC, id DESC LIMIT ?;";
 
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
@@ -368,7 +559,14 @@ char* db_get_predictions_json(int limit) {
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         const unsigned char *in = sqlite3_column_text(stmt, 2);
         const unsigned char *out_json = sqlite3_column_text(stmt, 3);
-        const unsigned char *created = sqlite3_column_text(stmt, 4);
+        const double risk_col = sqlite3_column_double(stmt, 4);
+        const unsigned char *category_col = sqlite3_column_text(stmt, 5);
+        const double confidence_col = sqlite3_column_double(stmt, 6);
+        const double isp_col = sqlite3_column_double(stmt, 7);
+        const double mito_col = sqlite3_column_double(stmt, 8);
+        const double inflam_col = sqlite3_column_double(stmt, 9);
+        const double imbalance_col = sqlite3_column_double(stmt, 10);
+        const unsigned char *created = sqlite3_column_text(stmt, 11);
         const unsigned char *pid = sqlite3_column_text(stmt, 1);
         cJSON *in_root = cJSON_Parse(in ? (const char*)in : "{}");
         cJSON *out_root = cJSON_Parse(out_json ? (const char*)out_json : "{}");
@@ -409,10 +607,24 @@ char* db_get_predictions_json(int limit) {
             add_number_or_null(row, "s100a8", in_item);
             add_number_or_null(row, "cxcl8", in_item);
 
-            add_number_or_null(row, "isp", out_item);
-            add_number_or_null(row, "risk_probability", out_item);
-            add_string_or_null(row, "category", out_item);
-            add_number_or_null(row, "confidence", out_item);
+            /* Сначала пытаемся взять из output_json; если нет — из денормализованных колонок. */
+            if (out_item && cJSON_IsObject(out_item)) {
+                add_number_or_null(row, "isp", out_item);
+                add_number_or_null(row, "risk_probability", out_item);
+                add_string_or_null(row, "category", out_item);
+                add_number_or_null(row, "confidence", out_item);
+                add_number_or_null(row, "mito_score", out_item);
+                add_number_or_null(row, "inflam_score", out_item);
+                add_number_or_null(row, "imbalance", out_item);
+            } else {
+                if (sqlite3_column_type(stmt, 7) != SQLITE_NULL) cJSON_AddNumberToObject(row, "isp", isp_col); else cJSON_AddNullToObject(row, "isp");
+                if (sqlite3_column_type(stmt, 4) != SQLITE_NULL) cJSON_AddNumberToObject(row, "risk_probability", risk_col); else cJSON_AddNullToObject(row, "risk_probability");
+                if (sqlite3_column_type(stmt, 5) != SQLITE_NULL && category_col) cJSON_AddStringToObject(row, "category", (const char*)category_col); else cJSON_AddNullToObject(row, "category");
+                if (sqlite3_column_type(stmt, 6) != SQLITE_NULL) cJSON_AddNumberToObject(row, "confidence", confidence_col); else cJSON_AddNullToObject(row, "confidence");
+                if (sqlite3_column_type(stmt, 8) != SQLITE_NULL) cJSON_AddNumberToObject(row, "mito_score", mito_col); else cJSON_AddNullToObject(row, "mito_score");
+                if (sqlite3_column_type(stmt, 9) != SQLITE_NULL) cJSON_AddNumberToObject(row, "inflam_score", inflam_col); else cJSON_AddNullToObject(row, "inflam_score");
+                if (sqlite3_column_type(stmt, 10) != SQLITE_NULL) cJSON_AddNumberToObject(row, "imbalance", imbalance_col); else cJSON_AddNullToObject(row, "imbalance");
+            }
 
             cJSON_AddStringToObject(row, "input_json", in ? (const char*)in : "");
             cJSON_AddStringToObject(row, "output_json", out_json ? (const char*)out_json : "");

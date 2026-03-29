@@ -14,6 +14,12 @@
 #define BUFFER_SIZE 8192
 #define MAX_REQUEST_SIZE (2 * 1024 * 1024)
 
+enum {
+    REQ_READ_OK = 0,
+    REQ_READ_ERR = 1,
+    REQ_READ_TOO_LARGE = 2
+};
+
 static char* read_ui_file(void) {
     const char *candidates[] = {
         "web/index.html",
@@ -75,7 +81,7 @@ static int read_http_request(int client, char **out_buf, int *out_len) {
         if (space <= 0) {
             if (cap >= MAX_REQUEST_SIZE) {
                 free(buf);
-                return -1;
+                return REQ_READ_TOO_LARGE;
             }
             cap *= 2;
             if (cap > MAX_REQUEST_SIZE) cap = MAX_REQUEST_SIZE;
@@ -101,7 +107,11 @@ static int read_http_request(int client, char **out_buf, int *out_len) {
                 expected_total = header_len + content_len;
                 if (expected_total < header_len) {
                     free(buf);
-                    return -1;
+                    return REQ_READ_ERR;
+                }
+                if (expected_total > MAX_REQUEST_SIZE) {
+                    free(buf);
+                    return REQ_READ_TOO_LARGE;
                 }
                 if (expected_total == header_len) break;
             }
@@ -112,13 +122,13 @@ static int read_http_request(int client, char **out_buf, int *out_len) {
 
     if (total <= 0) {
         free(buf);
-        return -1;
+        return REQ_READ_ERR;
     }
 
     buf[total] = '\0';
     *out_buf = buf;
     *out_len = total;
-    return 0;
+    return REQ_READ_OK;
 }
 
 /* ===== ОТВЕТ ===== */
@@ -279,7 +289,13 @@ int main() {
 
         char *buffer = NULL;
         int req_len = 0;
-        if (read_http_request(client_socket, &buffer, &req_len) != 0) {
+        int rr = read_http_request(client_socket, &buffer, &req_len);
+        if (rr != REQ_READ_OK) {
+            if (rr == REQ_READ_TOO_LARGE) {
+                send_response(client_socket, "413 Payload Too Large", "text/plain", "Request body too large");
+            } else {
+                send_response(client_socket, "400 Bad Request", "text/plain", "Invalid HTTP request");
+            }
             close(client_socket);
             continue;
         }

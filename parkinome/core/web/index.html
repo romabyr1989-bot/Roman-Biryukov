@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Parkinome Console</title>
+<title>Parkinome</title>
 <style>
 :root {
   --bg: #f5f5f7;
@@ -288,6 +288,131 @@ button:focus-visible {
   padding: 10px;
 }
 
+.group-title {
+  margin: 10px 0 6px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.modal-summary {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.viz-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 0.85fr 1.15fr;
+  gap: 10px;
+}
+
+.viz-card {
+  border: 1px solid #e7e7ec;
+  border-radius: 14px;
+  background: #fff;
+  padding: 10px;
+}
+
+.risk-hero {
+  font-size: 38px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.risk-hero.low { color: var(--ok); }
+.risk-hero.mid { color: var(--warn); }
+.risk-hero.high { color: var(--high); }
+
+.risk-chip {
+  display: inline-block;
+  margin-top: 4px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.contrib-row {
+  display: grid;
+  grid-template-columns: 120px 1fr 56px;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 7px;
+}
+
+.contrib-k {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.contrib-track {
+  position: relative;
+  height: 12px;
+  border-radius: 999px;
+  background: #f2f2f6;
+  overflow: hidden;
+}
+
+.contrib-bar {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  border-radius: 999px;
+}
+
+.contrib-bar.pos { background: #e45454; }
+.contrib-bar.neg { background: #2d8a4e; }
+
+.index-row {
+  margin-bottom: 8px;
+}
+
+.index-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-bottom: 4px;
+  color: var(--muted);
+}
+
+.index-track {
+  height: 10px;
+  border-radius: 999px;
+  background: #f2f2f6;
+  overflow: hidden;
+}
+
+.index-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #61a5ff, #0071e3);
+}
+
+.summary-card {
+  border: 1px solid #e7e7ec;
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: #fff;
+}
+
+.summary-k {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.summary-v {
+  margin-top: 3px;
+  font-weight: 700;
+  font-size: 16px;
+}
+
 .patient-head {
   display: flex;
   justify-content: space-between;
@@ -370,9 +495,22 @@ button:focus-visible {
 .history-table tbody tr:hover td {
   background: #fafaff;
 }
+.history-row-clickable { cursor: pointer; }
+.history-row-clickable.active td { background: #f4f8ff; }
 
 .history-table tr:last-child td {
   border-bottom: none;
+}
+
+.history-detail-cell {
+  padding: 0 !important;
+  background: #fff !important;
+}
+
+.history-detail-wrap {
+  padding: 12px;
+  border-top: 1px solid #ececf0;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfbfd 100%);
 }
 
 .mini-table {
@@ -457,6 +595,8 @@ button:focus-visible {
   .grid { grid-template-columns: 1fr; }
   .form-grid { grid-template-columns: 1fr; }
   .history-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .modal-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .viz-grid { grid-template-columns: 1fr; }
   .topbar { padding-top: 6px; padding-bottom: 6px; }
   .page { padding: 8px; }
 }
@@ -475,6 +615,7 @@ button:focus-visible {
 
     <section class="panel history-wrap">
       <h2>Saved Patients</h2>
+      <p style="margin-bottom:10px; font-size:12px;">Mito — mitochondrial score, Inflam — inflammatory score, Imbalance = Inflam - Mito.</p>
       <div class="history-filters">
         <input data-hf="id" placeholder="ID">
         <input data-hf="patient_id" placeholder="Patient ID">
@@ -495,6 +636,9 @@ button:focus-visible {
         <input data-hf="category" placeholder="Category">
         <input data-hf="confidence" placeholder="Confidence">
         <input data-hf="isp" placeholder="ISP">
+        <input data-hf="mito_score" placeholder="Mito Score">
+        <input data-hf="inflam_score" placeholder="Inflam Score">
+        <input data-hf="imbalance" placeholder="Imbalance">
         <input data-hf="created_at" placeholder="Saved At">
       </div>
       <div class="history-scroll">
@@ -519,6 +663,9 @@ button:focus-visible {
           <col style="width:90px">
           <col style="width:90px">
           <col style="width:70px">
+          <col style="width:95px">
+          <col style="width:100px">
+          <col style="width:90px">
           <col style="width:170px">
         </colgroup>
         <thead id="historyHead">
@@ -542,11 +689,14 @@ button:focus-visible {
             <th>Category</th>
             <th>Confidence</th>
             <th>ISP</th>
+            <th>Mito</th>
+            <th>Inflam</th>
+            <th>Imbalance</th>
             <th>Saved At</th>
           </tr>
         </thead>
         <tbody id="historyBody">
-          <tr><td colspan="20">No saved records yet.</td></tr>
+          <tr><td colspan="23">No saved records yet.</td></tr>
         </tbody>
       </table>
       </div>
@@ -573,7 +723,39 @@ button:focus-visible {
         <button id="btnSaveDb" type="button" class="btn-ghost">Save To DB</button>
         <button id="btnClear" type="button" class="btn-ghost">Clear</button>
       </div>
+      <div class="modal-summary">
+        <div class="summary-card"><div class="summary-k">Risk %</div><div id="sumRisk" class="summary-v">-</div></div>
+        <div class="summary-card"><div class="summary-k">Category</div><div id="sumCategory" class="summary-v">-</div></div>
+        <div class="summary-card"><div class="summary-k">Confidence</div><div id="sumConfidence" class="summary-v">-</div></div>
+        <div class="summary-card"><div class="summary-k">Mito</div><div id="sumMito" class="summary-v">-</div></div>
+        <div class="summary-card"><div class="summary-k">Inflam / Imb</div><div id="sumInflamImb" class="summary-v">-</div></div>
+      </div>
+      <div class="viz-grid">
+        <div class="viz-card">
+          <div class="summary-k">Risk Overview</div>
+          <div id="riskHero" class="risk-hero">-</div>
+          <div id="riskChip" class="risk-chip">-</div>
+          <div id="riskInterpretation" style="margin-top:8px; font-size:13px; color:var(--muted);">
+            Run prediction to see interpretation.
+          </div>
+        </div>
+        <div class="viz-card">
+          <div class="summary-k">Breakdown</div>
+          <div id="breakdownBars" style="margin-top:8px;"></div>
+        </div>
+      </div>
+      <div class="viz-grid" style="margin-top:10px;">
+        <div class="viz-card">
+          <div class="summary-k">Biological Indices</div>
+          <div id="indicesPanel" style="margin-top:8px;"></div>
+        </div>
+        <div class="viz-card">
+          <div class="summary-k">Gene Snapshot</div>
+          <div id="genePanel" style="margin-top:8px; font-size:13px; color:var(--muted);">No gene data.</div>
+        </div>
+      </div>
       <h2 style="margin-top:12px">Prediction Rows</h2>
+      <p style="margin-top:-2px; margin-bottom:8px; font-size:12px;">Mito — mitochondrial score, Inflam — inflammatory score, Imbalance = Inflam - Mito.</p>
       <table class="mini-table">
         <thead>
           <tr>
@@ -583,10 +765,13 @@ button:focus-visible {
             <th>Category</th>
             <th>Confidence</th>
             <th>ISP</th>
+            <th>Mito</th>
+            <th>Inflam</th>
+            <th>Imbalance</th>
           </tr>
         </thead>
         <tbody id="predictRowsBody">
-          <tr><td colspan="6">No prediction yet.</td></tr>
+          <tr><td colspan="9">No prediction yet.</td></tr>
         </tbody>
       </table>
       <div id="doctorError" class="notice hidden"></div>
@@ -602,9 +787,12 @@ button:focus-visible {
   let isExampleData = false;
   let uploadedPatients = [];
   let predictInputRows = [];
+  let predictOutputRows = [];
   let historyRowsRaw = [];
+  let historyRenderedRows = [];
   let historyFilters = {};
-  const historyColumns = ["id","patient_id","age","updrs_iii","moca","scopa_aut","hoehn_yahr","ndufa4l2","ndufs2","pink1","ppargc1a","nlrp3","il1b","s100a8","cxcl8","risk_probability","category","confidence","isp","created_at"];
+  /* Единый порядок колонок: фильтрация, сортировка и рендер таблицы должны совпадать. */
+  const historyColumns = ["id","patient_id","age","updrs_iii","moca","scopa_aut","hoehn_yahr","ndufa4l2","ndufs2","pink1","ppargc1a","nlrp3","il1b","s100a8","cxcl8","risk_probability","category","confidence","isp","mito_score","inflam_score","imbalance","created_at"];
   let historySortKey = "";
   let historySortDir = "asc";
   const $ = (id) => document.getElementById(id);
@@ -624,6 +812,216 @@ button:focus-visible {
     ["s100a8", "S100A8 (-10..10)", "number", "-10", "10", "0.01", "4.9"],
     ["cxcl8", "CXCL8 (-10..10)", "number", "-10", "10", "0.01", "5.6"]
   ];
+  const fieldMeta = Object.fromEntries(fieldDefs.map((f) => [f[0], f]));
+
+  function renderFieldInput(key) {
+    const meta = fieldMeta[key];
+    if (!meta) return "";
+    const [, label, type, min, max, step, ph] = meta;
+    return `
+      <div class="field">
+        <label>${label}</label>
+        <input data-field="${key}" type="${type}" ${min ? `min="${min}"` : ""} ${max ? `max="${max}"` : ""} ${step ? `step="${step}"` : ""} placeholder="${ph}">
+      </div>
+    `;
+  }
+
+  function setPredictSummary(row) {
+    const risk = Number(row?.risk_probability);
+    const conf = Number(row?.confidence);
+    const mito = Number(row?.mito_score);
+    const inflam = Number(row?.inflam_score);
+    const imb = Number(row?.imbalance);
+    $("sumRisk").innerText = Number.isFinite(risk) ? `${(risk * 100).toFixed(1)}%` : "-";
+    $("sumCategory").innerText = row?.category || "-";
+    $("sumConfidence").innerText = Number.isFinite(conf) ? conf.toFixed(2) : "-";
+    $("sumMito").innerText = Number.isFinite(mito) ? mito.toFixed(3) : "-";
+    $("sumInflamImb").innerText = (Number.isFinite(inflam) && Number.isFinite(imb))
+      ? `${inflam.toFixed(3)} / ${imb.toFixed(3)}`
+      : "-";
+
+    renderRiskOverview(row);
+    renderBreakdown(row?.breakdown || null);
+    renderIndices(row?.indices || null, row?.levels || null);
+    renderGenes(row?.genes || null);
+  }
+
+  function categoryClass(category) {
+    if (category === "LOW") return "low";
+    if (category === "INTERMEDIATE") return "mid";
+    return "high";
+  }
+
+  function renderRiskOverview(row) {
+    const risk = Number(row?.risk_probability);
+    const cat = row?.category || "-";
+    const hero = $("riskHero");
+    const chip = $("riskChip");
+    const text = $("riskInterpretation");
+    hero.className = "risk-hero";
+    hero.innerText = Number.isFinite(risk) ? `${(risk * 100).toFixed(0)}%` : "-";
+    chip.innerText = `Category: ${cat}`;
+    if (cat === "LOW" || cat === "INTERMEDIATE" || cat === "HIGH") {
+      hero.classList.add(categoryClass(cat));
+    }
+
+    const b = row?.breakdown || {};
+    const infl = Number(b.inflammation || 0);
+    const clin = Number(b.clinical || 0);
+    const mito = Number(b.mitochondrial || 0);
+    const cog = Number(b.cognitive || 0);
+    const parts = [];
+    if (infl > 0.05) parts.push("inflammation");
+    if (clin > 0.05) parts.push("clinical severity");
+    if (cog > 0.05) parts.push("cognitive deficit");
+    if (mito < -0.05) parts.push("mitochondrial profile is partially protective");
+    text.innerText = parts.length
+      ? `Risk signal is driven by ${parts.join(", ")}.`
+      : "No dominant driver detected for this profile.";
+  }
+
+  function renderBreakdown(breakdown) {
+    const host = $("breakdownBars");
+    if (!host) return;
+    if (!breakdown || typeof breakdown !== "object") {
+      host.innerHTML = `<div style="font-size:13px; color:var(--muted);">No breakdown data.</div>`;
+      return;
+    }
+    const rows = [
+      ["clinical", "Clinical", Number(breakdown.clinical || 0)],
+      ["cognitive", "Cognitive", Number(breakdown.cognitive || 0)],
+      ["inflammation", "Inflammation", Number(breakdown.inflammation || 0)],
+      ["mitochondrial", "Mitochondrial", Number(breakdown.mitochondrial || 0)],
+      ["imbalance", "Imbalance", Number(breakdown.imbalance || 0)]
+    ];
+    const maxAbs = Math.max(0.1, ...rows.map((r) => Math.abs(r[2])));
+    host.innerHTML = rows.map(([, label, v]) => {
+      const w = Math.min(100, (Math.abs(v) / maxAbs) * 100);
+      const cls = v >= 0 ? "pos" : "neg";
+      return `<div class="contrib-row">
+        <div class="contrib-k">${label}</div>
+        <div class="contrib-track"><div class="contrib-bar ${cls}" style="width:${w}%"></div></div>
+        <div style="font-size:12px; text-align:right;">${v.toFixed(2)}</div>
+      </div>`;
+    }).join("");
+  }
+
+  function renderIndices(indices, levels) {
+    const host = $("indicesPanel");
+    if (!host) return;
+    if (!indices || typeof indices !== "object") {
+      host.innerHTML = `<div style="font-size:13px; color:var(--muted);">No index data.</div>`;
+      return;
+    }
+    const items = [
+      ["Mitochondrial", Number(indices.mito), levels?.mitochondrial || "-"],
+      ["Inflammation", Number(indices.inflammation), levels?.inflammation || "-"],
+      ["Stress", Number(indices.stress), "-"]
+    ];
+    host.innerHTML = items.map(([name, v, lvl]) => {
+      const value = Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0;
+      return `<div class="index-row">
+        <div class="index-head"><span>${name}</span><span>${(value * 100).toFixed(0)}% ${lvl !== "-" ? `(${lvl})` : ""}</span></div>
+        <div class="index-track"><div class="index-fill" style="width:${(value * 100).toFixed(1)}%"></div></div>
+      </div>`;
+    }).join("");
+  }
+
+  function renderGenes(genes) {
+    const host = $("genePanel");
+    if (!host) return;
+    if (!genes || typeof genes !== "object" || !Object.keys(genes).length) {
+      host.innerText = "No gene data.";
+      return;
+    }
+    const rows = Object.entries(genes).map(([k, v]) => `<tr><td>${k.toUpperCase()}</td><td>${Number(v).toFixed(3)}</td></tr>`).join("");
+    host.innerHTML = `<table class="mini-table" style="margin-top:0;"><thead><tr><th>Gene</th><th>Value</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
+
+  function rowRiskCategory(row) {
+    const c = String(row?.category || "").toUpperCase();
+    if (c === "LOW" || c === "INTERMEDIATE" || c === "HIGH") return c;
+    const rp = Number(row?.risk_probability);
+    if (!Number.isFinite(rp)) return "-";
+    if (rp < 0.33) return "LOW";
+    if (rp < 0.66) return "INTERMEDIATE";
+    return "HIGH";
+  }
+
+  function inlineDetailHtml(row) {
+    const risk = Number(row?.risk_probability);
+    const category = rowRiskCategory(row);
+    const riskCls = (category === "LOW") ? "low" : (category === "INTERMEDIATE" ? "mid" : "high");
+    const mito = Number(row?.mito_score);
+    const inflam = Number(row?.inflam_score);
+    const imb = Number(row?.imbalance);
+    const mitoIndex = Number.isFinite(mito) ? Math.max(0, Math.min(1, (mito + 3) / 6)) : 0.5;
+    const inflamIndex = Number.isFinite(inflam) ? Math.max(0, Math.min(1, (inflam + 3) / 6)) : 0.5;
+    const stressIndex = Number.isFinite(imb) ? Math.max(0, Math.min(1, (imb + 3) / 6)) : 0.5;
+    const fallback = [
+      Number.isFinite(risk) ? (risk - 0.5) : 0,
+      0,
+      Number.isFinite(inflam) ? inflam * 0.15 : 0,
+      Number.isFinite(mito) ? -mito * 0.12 : 0,
+      Number.isFinite(imb) ? imb * 0.18 : 0
+    ];
+    const breakdown = [
+      ["Clinical", Number.isFinite(Number(row?.breakdown_clinical)) ? Number(row.breakdown_clinical) : fallback[0]],
+      ["Cognitive", Number.isFinite(Number(row?.breakdown_cognitive)) ? Number(row.breakdown_cognitive) : fallback[1]],
+      ["Inflammation", Number.isFinite(Number(row?.breakdown_inflammation)) ? Number(row.breakdown_inflammation) : fallback[2]],
+      ["Mitochondrial", Number.isFinite(Number(row?.breakdown_mitochondrial)) ? Number(row.breakdown_mitochondrial) : fallback[3]],
+      ["Imbalance", Number.isFinite(Number(row?.breakdown_imbalance)) ? Number(row.breakdown_imbalance) : fallback[4]]
+    ];
+    const maxAbs = Math.max(0.1, ...breakdown.map((x) => Math.abs(x[1])));
+    return `
+      <div class="history-detail-wrap">
+        <div class="viz-grid" style="margin-top:0;">
+          <div class="viz-card">
+            <div class="summary-k">Risk Overview</div>
+            <div class="risk-hero ${riskCls}">${Number.isFinite(risk) ? `${(risk * 100).toFixed(0)}%` : "-"}</div>
+            <div class="risk-chip">Category: ${category}</div>
+          </div>
+          <div class="viz-card">
+            <div class="summary-k">Breakdown</div>
+            <div style="margin-top:8px;">
+              ${breakdown.map(([name, v]) => `
+                <div class="contrib-row">
+                  <div class="contrib-k">${name}</div>
+                  <div class="contrib-track"><div class="contrib-bar ${v >= 0 ? "pos" : "neg"}" style="width:${Math.min(100, (Math.abs(v) / maxAbs) * 100)}%"></div></div>
+                  <div style="font-size:12px; text-align:right;">${Number.isFinite(v) ? v.toFixed(2) : "-"}</div>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        </div>
+        <div class="viz-grid" style="margin-top:10px;">
+          <div class="viz-card">
+            <div class="summary-k">Biological Indices</div>
+            <div class="index-row">
+              <div class="index-head"><span>Mitochondrial</span><span>${(mitoIndex * 100).toFixed(0)}%</span></div>
+              <div class="index-track"><div class="index-fill" style="width:${(mitoIndex * 100).toFixed(1)}%"></div></div>
+            </div>
+            <div class="index-row">
+              <div class="index-head"><span>Inflammation</span><span>${(inflamIndex * 100).toFixed(0)}%</span></div>
+              <div class="index-track"><div class="index-fill" style="width:${(inflamIndex * 100).toFixed(1)}%"></div></div>
+            </div>
+            <div class="index-row">
+              <div class="index-head"><span>Stress</span><span>${(stressIndex * 100).toFixed(0)}%</span></div>
+              <div class="index-track"><div class="index-fill" style="width:${(stressIndex * 100).toFixed(1)}%"></div></div>
+            </div>
+          </div>
+          <div class="viz-card">
+            <div class="summary-k">Interpretation</div>
+            <div style="margin-top:8px; font-size:13px; color:var(--muted);">
+              ${category === "HIGH" ? "High-risk profile; clinical and inflammatory burden should be reviewed first."
+                : category === "INTERMEDIATE" ? "Intermediate profile; monitor trend and key drivers over time."
+                : "Lower risk profile; maintain follow-up and observe changes in biomarkers."}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
 
   function applyRole(role) {
     $("doctorUI").classList.add("hidden");
@@ -736,7 +1134,8 @@ button:focus-visible {
       uploadedPatients = [];
       isExampleData = false;
       if ($("uploadMeta")) $("uploadMeta").innerText = "";
-      $("predictRowsBody").innerHTML = `<tr><td colspan="6">No prediction yet.</td></tr>`;
+      $("predictRowsBody").innerHTML = `<tr><td colspan="9">No prediction yet.</td></tr>`;
+      setPredictSummary(null);
       $("doctorError").classList.add("hidden");
       lastPredictInput = null;
       lastPredictOutput = null;
@@ -757,13 +1156,21 @@ button:focus-visible {
       <div class="patient-head">
         <div class="patient-title">Patient #${idx}</div>
       </div>
+      <div class="group-title">Clinical</div>
       <div class="form-grid">
-        ${fieldDefs.map(([key, label, type, min, max, step, ph]) => `
-          <div class="field">
-            <label>${label}</label>
-            <input data-field="${key}" type="${type}" ${min ? `min="${min}"` : ""} ${max ? `max="${max}"` : ""} ${step ? `step="${step}"` : ""} placeholder="${ph}">
-          </div>
-        `).join("")}
+        ${["patient_id","age","updrs_iii","scopa_aut","hoehn_yahr"].map(renderFieldInput).join("")}
+      </div>
+      <div class="group-title">Cognitive</div>
+      <div class="form-grid">
+        ${["moca"].map(renderFieldInput).join("")}
+      </div>
+      <div class="group-title">Mitochondrial</div>
+      <div class="form-grid">
+        ${["ndufa4l2","ndufs2","pink1","ppargc1a"].map(renderFieldInput).join("")}
+      </div>
+      <div class="group-title">Inflammatory</div>
+      <div class="form-grid">
+        ${["nlrp3","il1b","s100a8","cxcl8"].map(renderFieldInput).join("")}
       </div>
     `;
 
@@ -824,16 +1231,19 @@ button:focus-visible {
     isExampleData = false;
     uploadedPatients = [];
     if ($("uploadMeta")) $("uploadMeta").innerText = "";
+    setPredictSummary(null);
   }
 
   function renderPredictRows(res) {
     const body = $("predictRowsBody");
     if (!body) return;
     const rows = Array.isArray(res?.patients) ? res.patients : [];
+    predictOutputRows = rows;
     const inputRows = Array.isArray(lastPredictInput?.patients) ? lastPredictInput.patients : [];
     predictInputRows = inputRows;
     if (rows.length === 0) {
-      body.innerHTML = `<tr><td colspan="6">No prediction yet.</td></tr>`;
+      body.innerHTML = `<tr><td colspan="9">No prediction yet.</td></tr>`;
+      setPredictSummary(null);
       return;
     }
     body.innerHTML = rows.map((p, i) => {
@@ -841,6 +1251,10 @@ button:focus-visible {
       const riskText = Number.isFinite(risk) ? (risk * 100).toFixed(1) : "-";
       const conf = (typeof p.confidence === "number") ? p.confidence.toFixed(2) : "-";
       const isp = (typeof p.isp === "number") ? p.isp.toFixed(3) : "-";
+      /* Для биомаркерных индексов показываем фиксированную точность как у lab-metrics. */
+      const mito = (typeof p.mito_score === "number") ? p.mito_score.toFixed(3) : "-";
+      const inflam = (typeof p.inflam_score === "number") ? p.inflam_score.toFixed(3) : "-";
+      const imb = (typeof p.imbalance === "number") ? p.imbalance.toFixed(3) : "-";
       return `<tr data-predict-row="${i}" style="cursor:pointer">
         <td>${i + 1}</td>
         <td>${p.patient_id || "-"}</td>
@@ -848,8 +1262,12 @@ button:focus-visible {
         <td>${p.category || "-"}</td>
         <td>${conf}</td>
         <td>${isp}</td>
+        <td>${mito}</td>
+        <td>${inflam}</td>
+        <td>${imb}</td>
       </tr>`;
     }).join("");
+    setPredictSummary(rows[0] || null);
   }
 
   function openPatientCardFromPredictRow(idx) {
@@ -873,6 +1291,7 @@ button:focus-visible {
     });
     uploadedPatients = [];
     isExampleData = false;
+    setPredictSummary(predictOutputRows[idx] || null);
   }
 
   function toPatientsArray(jsonText) {
@@ -887,6 +1306,25 @@ button:focus-visible {
     }
   }
 
+  function parseBreakdownFromOutputJson(jsonText) {
+    try {
+      const parsed = JSON.parse(jsonText || "{}");
+      const row = Array.isArray(parsed?.patients) ? parsed.patients[0]
+        : (Array.isArray(parsed) ? parsed[0] : parsed);
+      const b = row?.breakdown;
+      if (!b || typeof b !== "object") return null;
+      return {
+        clinical: Number.isFinite(Number(b.clinical)) ? Number(b.clinical) : null,
+        cognitive: Number.isFinite(Number(b.cognitive)) ? Number(b.cognitive) : null,
+        inflammation: Number.isFinite(Number(b.inflammation)) ? Number(b.inflammation) : null,
+        mitochondrial: Number.isFinite(Number(b.mitochondrial)) ? Number(b.mitochondrial) : null,
+        imbalance: Number.isFinite(Number(b.imbalance)) ? Number(b.imbalance) : null
+      };
+    } catch (_) {
+      return null;
+    }
+  }
+
   function hasFlatHistoryFields(row) {
     if (!row || typeof row !== "object") return false;
     return ("risk_probability" in row) || ("age" in row) || ("updrs_iii" in row);
@@ -897,6 +1335,7 @@ button:focus-visible {
     if (col === "risk_probability" && typeof v === "number") return (v * 100).toFixed(1);
     if (col === "confidence" && typeof v === "number") return v.toFixed(2);
     if (col === "isp" && typeof v === "number") return v.toFixed(3);
+    if ((col === "mito_score" || col === "inflam_score" || col === "imbalance") && typeof v === "number") return v.toFixed(3);
     if (v === null || v === undefined) return "";
     return String(v);
   }
@@ -982,7 +1421,7 @@ button:focus-visible {
     if (visible === 0 && rows.length > 0) {
       const tr = document.createElement("tr");
       tr.id = "historyNoMatch";
-      tr.innerHTML = `<td colspan="20">No rows match current filters.</td>`;
+      tr.innerHTML = `<td colspan="23">No rows match current filters.</td>`;
       body.appendChild(tr);
     }
   }
@@ -992,7 +1431,7 @@ button:focus-visible {
     if (!body) return;
 
     if (!Array.isArray(rows) || rows.length === 0) {
-      body.innerHTML = `<tr><td colspan="20">No saved records yet.</td></tr>`;
+      body.innerHTML = `<tr><td colspan="23">No saved records yet.</td></tr>`;
       return;
     }
 
@@ -1012,6 +1451,7 @@ button:focus-visible {
     const normalizedRows = [];
     for (const row of uniqueRows) {
       if (hasFlatHistoryFields(row)) {
+        const b = parseBreakdownFromOutputJson(row.output_json);
         normalizedRows.push({
           id: row.id ?? null,
           patient_id: row.patient_id ?? null,
@@ -1032,6 +1472,14 @@ button:focus-visible {
           category: row.category ?? null,
           confidence: (typeof row.confidence === "number") ? row.confidence : null,
           isp: (typeof row.isp === "number") ? row.isp : null,
+          mito_score: (typeof row.mito_score === "number") ? row.mito_score : null,
+          inflam_score: (typeof row.inflam_score === "number") ? row.inflam_score : null,
+          imbalance: (typeof row.imbalance === "number") ? row.imbalance : null,
+          breakdown_clinical: (typeof b?.clinical === "number") ? b.clinical : null,
+          breakdown_cognitive: (typeof b?.cognitive === "number") ? b.cognitive : null,
+          breakdown_inflammation: (typeof b?.inflammation === "number") ? b.inflammation : null,
+          breakdown_mitochondrial: (typeof b?.mitochondrial === "number") ? b.mitochondrial : null,
+          breakdown_imbalance: (typeof b?.imbalance === "number") ? b.imbalance : null,
           created_at: row.created_at ?? null
         });
         continue;
@@ -1046,6 +1494,7 @@ button:focus-visible {
         const out = outputPatients[i] || {};
         const risk = Number(out.risk_probability);
         const pid = input.patient_id || out.patient_id || row.patient_id || "-";
+        const breakdown = (out && typeof out.breakdown === "object") ? out.breakdown : {};
 
         normalizedRows.push({
           id: row.id ?? null,
@@ -1067,6 +1516,14 @@ button:focus-visible {
           category: out.category ?? null,
           confidence: (typeof out.confidence === "number") ? out.confidence : null,
           isp: (typeof out.isp === "number") ? out.isp : null,
+          mito_score: (typeof out.mito_score === "number") ? out.mito_score : null,
+          inflam_score: (typeof out.inflam_score === "number") ? out.inflam_score : null,
+          imbalance: (typeof out.imbalance === "number") ? out.imbalance : null,
+          breakdown_clinical: (typeof breakdown.clinical === "number") ? breakdown.clinical : null,
+          breakdown_cognitive: (typeof breakdown.cognitive === "number") ? breakdown.cognitive : null,
+          breakdown_inflammation: (typeof breakdown.inflammation === "number") ? breakdown.inflammation : null,
+          breakdown_mitochondrial: (typeof breakdown.mitochondrial === "number") ? breakdown.mitochondrial : null,
+          breakdown_imbalance: (typeof breakdown.imbalance === "number") ? breakdown.imbalance : null,
           created_at: row.created_at ?? null
         });
       }
@@ -1075,8 +1532,9 @@ button:focus-visible {
     const sortedRows = historySortKey
       ? [...normalizedRows].sort((a, b) => compareHistoryRows(a, b, historySortKey, historySortDir))
       : normalizedRows;
-    body.innerHTML = sortedRows.map((r) => `
-      <tr>
+    historyRenderedRows = sortedRows;
+    body.innerHTML = sortedRows.map((r, idx) => `
+      <tr class="history-row-clickable" data-history-row="${idx}">
         <td>${r.id ?? "-"}</td>
         <td>${r.patient_id ?? "-"}</td>
         <td>${r.age ?? "-"}</td>
@@ -1096,6 +1554,9 @@ button:focus-visible {
         <td>${r.category ?? "-"}</td>
         <td>${historyValue(r, "confidence") || "-"}</td>
         <td>${historyValue(r, "isp") || "-"}</td>
+        <td>${historyValue(r, "mito_score") || "-"}</td>
+        <td>${historyValue(r, "inflam_score") || "-"}</td>
+        <td>${historyValue(r, "imbalance") || "-"}</td>
         <td>${r.created_at ?? "-"}</td>
       </tr>
     `).join("");
@@ -1210,7 +1671,9 @@ button:focus-visible {
     if ($("uploadMeta")) $("uploadMeta").innerText = "";
     lastPredictInput = null;
     lastPredictOutput = null;
-    $("predictRowsBody").innerHTML = `<tr><td colspan="6">No prediction yet.</td></tr>`;
+    predictOutputRows = [];
+    $("predictRowsBody").innerHTML = `<tr><td colspan="9">No prediction yet.</td></tr>`;
+    setPredictSummary(null);
     $("doctorError").classList.add("hidden");
   }
 
@@ -1225,11 +1688,13 @@ button:focus-visible {
       isExampleData = false;
       lastPredictInput = null;
       lastPredictOutput = null;
+      predictOutputRows = [];
       if ($("uploadMeta")) {
         $("uploadMeta").innerText = `Loaded ${patients.length} patients from ${file.name}`;
       }
       if (patients[0]) addPatientCard(patients[0]);
-      $("predictRowsBody").innerHTML = `<tr><td colspan="6">No prediction yet.</td></tr>`;
+      $("predictRowsBody").innerHTML = `<tr><td colspan="9">No prediction yet.</td></tr>`;
+      setPredictSummary(null);
     } catch (err) {
       showDoctorError("File import failed: " + err.message);
     } finally {
@@ -1294,6 +1759,25 @@ button:focus-visible {
     const idx = Number(tr.getAttribute("data-predict-row"));
     if (!Number.isFinite(idx)) return;
     openPatientCardFromPredictRow(idx);
+  });
+  $("historyBody")?.addEventListener("click", (e) => {
+    const tr = e.target?.closest?.("tr[data-history-row]");
+    if (!tr) return;
+    const idx = Number(tr.getAttribute("data-history-row"));
+    if (!Number.isFinite(idx)) return;
+    const row = historyRenderedRows[idx];
+    if (!row) return;
+    const body = $("historyBody");
+    const existing = body.querySelector("tr[data-history-detail='1']");
+    const sameTarget = existing && existing.previousElementSibling === tr;
+    if (existing) existing.remove();
+    body.querySelectorAll("tr.history-row-clickable.active").forEach((x) => x.classList.remove("active"));
+    if (sameTarget) return;
+    tr.classList.add("active");
+    const detailTr = document.createElement("tr");
+    detailTr.setAttribute("data-history-detail", "1");
+    detailTr.innerHTML = `<td class="history-detail-cell" colspan="23">${inlineDetailHtml(row)}</td>`;
+    tr.insertAdjacentElement("afterend", detailTr);
   });
 
   loadRole();
