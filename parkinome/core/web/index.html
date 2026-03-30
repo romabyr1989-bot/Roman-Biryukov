@@ -279,6 +279,16 @@ button:focus-visible {
   color: #7a5b10;
 }
 
+.note {
+  margin-top: 8px;
+  border-radius: 12px;
+  padding: 10px;
+  font-size: 13px;
+  background: #f8fbff;
+  border: 1px solid #d9e8fb;
+  color: #284b7a;
+}
+
 .patient-list {
   margin-top: 12px;
   display: grid;
@@ -766,18 +776,9 @@ button:focus-visible {
       <div id="patientsList" class="patient-list"></div>
       <div class="actions">
         <button id="btnPredict" type="button" class="btn-primary">Run Prediction</button>
-        <button id="btnTrainModelModal" type="button" class="btn-primary">Train Model</button>
         <button id="btnExample" type="button" class="btn-ghost">Insert Example</button>
         <button id="btnSaveDb" type="button" class="btn-ghost">Save To DB</button>
         <button id="btnClear" type="button" class="btn-ghost">Clear</button>
-      </div>
-      <div class="summary-k" style="margin-top:6px;">Training Metrics</div>
-      <div class="result train-metrics-grid" style="margin-top:6px;">
-        <div class="metric"><div class="k">Accuracy</div><div id="modalTrainAccuracy" class="v">-</div></div>
-        <div class="metric"><div class="k">Precision</div><div id="modalTrainPrecision" class="v">-</div></div>
-        <div class="metric"><div class="k">Recall</div><div id="modalTrainRecall" class="v">-</div></div>
-        <div class="metric"><div class="k">Specificity</div><div id="modalTrainSpecificity" class="v">-</div></div>
-        <div class="metric"><div class="k">Samples</div><div id="modalTrainSamples" class="v">-</div></div>
       </div>
       <div class="modal-summary">
         <div class="summary-card"><div class="summary-k">Risk %</div><div id="sumRisk" class="summary-v">-</div></div>
@@ -791,9 +792,6 @@ button:focus-visible {
           <div class="summary-k">Risk Overview</div>
           <div id="riskHero" class="risk-hero">-</div>
           <div id="riskChip" class="risk-chip">-</div>
-          <div id="riskInterpretation" style="margin-top:8px; font-size:13px; color:var(--muted);">
-            Run prediction to see interpretation.
-          </div>
         </div>
         <div class="viz-card">
           <div class="summary-k">Breakdown</div>
@@ -809,6 +807,11 @@ button:focus-visible {
           <div class="summary-k">Gene Snapshot</div>
           <div id="genePanel" style="margin-top:8px; font-size:13px; color:var(--muted);">No gene data.</div>
         </div>
+      </div>
+      <div class="viz-card" style="margin-top:10px;">
+        <h2 style="margin-bottom:8px;">Clinical Interpretation</h2>
+        <div id="drivers"></div>
+        <div id="interpretationText" class="note">Run prediction to see interpretation.</div>
       </div>
       <h2 style="margin-top:12px">Prediction Rows</h2>
       <p style="margin-top:-2px; margin-bottom:8px; font-size:12px;">Mito — mitochondrial score, Inflam — inflammatory score, Imbalance = Inflam - Mito.</p>
@@ -923,6 +926,45 @@ button:focus-visible {
     renderBreakdown(breakdown || null, row);
     renderIndices(row?.indices || null, row?.levels || null);
     renderGenes(row?.genes || null);
+
+    renderExplanation({
+      explainability: {
+        inflammation: Number(breakdown?.inflammation || 0),
+        clinical: Number(breakdown?.clinical || 0),
+        mitochondrial: Number(breakdown?.mitochondrial || 0)
+      },
+      interpretation: row?.interpretation || interpretationText(row, breakdown)
+    });
+  }
+
+  function renderExplanation(data) {
+    const host = $("drivers");
+    const text = $("interpretationText");
+    if (!host || !text) return;
+
+    const exp = data?.explainability || {};
+    const drivers = [
+      { key: "inflammation", label: "Inflammation", value: Number(exp.inflammation || 0) },
+      { key: "clinical", label: "Clinical", value: Number(exp.clinical || 0) },
+      { key: "mitochondrial", label: "Mitochondrial", value: Number(exp.mitochondrial || 0) }
+    ].sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
+
+    const maxAbs = Math.max(1e-9, ...drivers.map((d) => Math.abs(d.value)));
+    const clsFor = (v) => {
+      const ratio = Math.abs(v) / maxAbs;
+      if (ratio >= 0.66) return "high";
+      if (ratio >= 0.33) return "mid";
+      return "low";
+    };
+
+    host.innerHTML = drivers.map((d) => `
+      <div class="metric" style="margin-bottom:8px;">
+        <div class="k">${d.label}</div>
+        <div class="v ${clsFor(d.value)}">${d.value.toFixed(3)}</div>
+      </div>
+    `).join("");
+
+    text.innerText = data?.interpretation || "No interpretation available.";
   }
 
   function categoryClass(category) {
@@ -936,7 +978,6 @@ button:focus-visible {
     const cat = row?.category || "-";
     const hero = $("riskHero");
     const chip = $("riskChip");
-    const text = $("riskInterpretation");
     hero.className = "risk-hero";
     hero.innerText = Number.isFinite(risk) ? `${(risk * 100).toFixed(0)}%` : "-";
     chip.innerText = `Category: ${cat}`;
@@ -954,7 +995,6 @@ button:focus-visible {
     if (clin > 0.05) parts.push("clinical severity");
     if (cog > 0.05) parts.push("cognitive deficit");
     if (mito < -0.05) parts.push("mitochondrial profile is partially protective");
-    text.innerText = interpretationText(row, b);
   }
 
   function renderBreakdown(breakdown, rowForFallback = null) {
@@ -1162,12 +1202,7 @@ button:focus-visible {
       ["trainPrecision", precision],
       ["trainRecall", recall],
       ["trainSpecificity", specificity],
-      ["trainSamples", samples],
-      ["modalTrainAccuracy", accuracy],
-      ["modalTrainPrecision", precision],
-      ["modalTrainRecall", recall],
-      ["modalTrainSpecificity", specificity],
-      ["modalTrainSamples", samples]
+      ["trainSamples", samples]
     ];
 
     ids.forEach(([id, value]) => {
@@ -2015,7 +2050,6 @@ button:focus-visible {
   });
   $("btnPredict")?.addEventListener("click", predict);
   $("btnTrainModel")?.addEventListener("click", trainModel);
-  $("btnTrainModelModal")?.addEventListener("click", trainModel);
   $("btnUploadPatients")?.addEventListener("click", () => $("patientsFileInput")?.click());
   $("btnDownloadTemplate")?.addEventListener("click", downloadCsvTemplate);
   $("patientsFileInput")?.addEventListener("change", onPatientsFileSelected);

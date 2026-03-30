@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include <cjson/cJSON.h>
 
 #include "predict.h"
@@ -26,6 +27,37 @@ static const char *level_str(int level) {
     return (level == 0) ? "LOW" :
            (level == 1) ? "INTERMEDIATE" :
                           "HIGH";
+}
+
+static void append_driver_if_relevant(char *buf, size_t size, const char *name, double value, int *first) {
+    if (!buf || size == 0 || !name || !first) return;
+    if (fabs(value) < 0.25) return;
+    if (!(*first)) strncat(buf, ", ", size - strlen(buf) - 1);
+    strncat(buf, name, size - strlen(buf) - 1);
+    *first = 0;
+}
+
+static void build_interpretation(const parkinome_output_t *out, char *buf, size_t size) {
+    const char *base;
+    char drivers[160] = {0};
+    int first = 1;
+    if (!out || !buf || size == 0) return;
+
+    if (out->category == 2) base = "High-risk profile; prioritize clinical review and mitigation.";
+    else if (out->category == 1) base = "Intermediate profile; monitor trend and key drivers.";
+    else base = "Lower risk profile; continue observation.";
+
+    append_driver_if_relevant(drivers, sizeof(drivers), "inflammation", out->breakdown_inflammation, &first);
+    append_driver_if_relevant(drivers, sizeof(drivers), "clinical", out->breakdown_clinical, &first);
+    append_driver_if_relevant(drivers, sizeof(drivers), "mitochondrial", out->breakdown_mitochondrial, &first);
+
+    if (drivers[0] != '\0') {
+        snprintf(buf, size, "%s Risk %.0f%%. Key drivers: %s. Confidence %.2f.",
+                 base, out->risk_probability * 100.0, drivers, out->confidence);
+    } else {
+        snprintf(buf, size, "%s Risk %.0f%%. Confidence %.2f.",
+                 base, out->risk_probability * 100.0, out->confidence);
+    }
 }
 
 /* ===== ПАРСЕР ===== */
@@ -78,9 +110,11 @@ static int append_prediction(cJSON *patient, cJSON *patients_out) {
     cJSON *row = NULL;
     const char *cat = NULL;
     cJSON *breakdown = NULL;
+    cJSON *explainability = NULL;
     cJSON *indices = NULL;
     cJSON *levels = NULL;
     cJSON *genes = NULL;
+    char interpretation[320] = {0};
 
     if (parse_patient(patient, &in) != 0) {
         return 1;
@@ -106,14 +140,18 @@ static int append_prediction(cJSON *patient, cJSON *patients_out) {
     cJSON_AddNumberToObject(row, "mito_score", out.mito_score);
     cJSON_AddNumberToObject(row, "inflam_score", out.inflam_score);
     cJSON_AddNumberToObject(row, "imbalance", out.imbalance);
+    build_interpretation(&out, interpretation, sizeof(interpretation));
+    cJSON_AddStringToObject(row, "interpretation", interpretation);
 
     /* UI-friendly structured blocks for interpretability. */
     breakdown = cJSON_CreateObject();
+    explainability = cJSON_CreateObject();
     indices = cJSON_CreateObject();
     levels = cJSON_CreateObject();
     genes = cJSON_CreateObject();
-    if (!breakdown || !indices || !levels || !genes) {
+    if (!breakdown || !explainability || !indices || !levels || !genes) {
         if (breakdown) cJSON_Delete(breakdown);
+        if (explainability) cJSON_Delete(explainability);
         if (indices) cJSON_Delete(indices);
         if (levels) cJSON_Delete(levels);
         if (genes) cJSON_Delete(genes);
@@ -127,6 +165,10 @@ static int append_prediction(cJSON *patient, cJSON *patients_out) {
     cJSON_AddNumberToObject(breakdown, "mitochondrial", out.breakdown_mitochondrial);
     cJSON_AddNumberToObject(breakdown, "imbalance", out.breakdown_imbalance);
     cJSON_AddItemToObject(row, "breakdown", breakdown);
+    cJSON_AddNumberToObject(explainability, "clinical", out.breakdown_clinical);
+    cJSON_AddNumberToObject(explainability, "inflammation", out.breakdown_inflammation);
+    cJSON_AddNumberToObject(explainability, "mitochondrial", out.breakdown_mitochondrial);
+    cJSON_AddItemToObject(row, "explainability", explainability);
 
     cJSON_AddNumberToObject(indices, "mito", out.mito_index);
     cJSON_AddNumberToObject(indices, "inflammation", out.inflam_index);
