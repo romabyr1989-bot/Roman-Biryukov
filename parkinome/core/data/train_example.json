@@ -1,0 +1,16 @@
+{
+  "patients": [
+    {"patient_id":"P-3001","age":55,"updrs_iii":18,"moca":27,"scopa_aut":13,"hoehn_yahr":1.0,"ndufa4l2":-0.1,"ndufs2":0.0,"pink1":-0.2,"ppargc1a":-0.1,"nlrp3":0.2,"il1b":0.2,"s100a8":0.1,"cxcl8":0.2,"target":0},
+    {"patient_id":"P-3002","age":58,"updrs_iii":24,"moca":25,"scopa_aut":18,"hoehn_yahr":1.5,"ndufa4l2":-0.2,"ndufs2":-0.1,"pink1":-0.2,"ppargc1a":-0.2,"nlrp3":0.6,"il1b":0.5,"s100a8":0.4,"cxcl8":0.5,"target":0},
+    {"patient_id":"P-3003","age":63,"updrs_iii":31,"moca":23,"scopa_aut":22,"hoehn_yahr":2.0,"ndufa4l2":-0.4,"ndufs2":-0.3,"pink1":-0.4,"ppargc1a":-0.3,"nlrp3":0.9,"il1b":0.8,"s100a8":0.7,"cxcl8":0.8,"target":1},
+    {"patient_id":"P-3004","age":69,"updrs_iii":40,"moca":19,"scopa_aut":28,"hoehn_yahr":2.5,"ndufa4l2":-0.6,"ndufs2":-0.5,"pink1":-0.7,"ppargc1a":-0.5,"nlrp3":1.5,"il1b":1.3,"s100a8":1.1,"cxcl8":1.2,"target":1},
+    {"patient_id":"P-3005","age":74,"updrs_iii":50,"moca":15,"scopa_aut":35,"hoehn_yahr":3.5,"ndufa4l2":-0.9,"ndufs2":-0.8,"pink1":-1.0,"ppargc1a":-0.8,"nlrp3":2.2,"il1b":2.0,"s100a8":1.8,"cxcl8":2.1,"target":1},
+    {"patient_id":"P-3006","age":54,"updrs_iii":20,"moca":27,"scopa_aut":15,"hoehn_yahr":1.0,"ndufa4l2":0.0,"ndufs2":0.1,"pink1":-0.1,"ppargc1a":0.0,"nlrp3":0.3,"il1b":0.2,"s100a8":0.2,"cxcl8":0.3,"target":0},
+    {"patient_id":"P-3007","age":61,"updrs_iii":29,"moca":24,"scopa_aut":20,"hoehn_yahr":2.0,"ndufa4l2":-0.3,"ndufs2":-0.2,"pink1":-0.3,"ppargc1a":-0.2,"nlrp3":0.8,"il1b":0.7,"s100a8":0.6,"cxcl8":0.7,"target":0},
+    {"patient_id":"P-3008","age":67,"updrs_iii":37,"moca":21,"scopa_aut":26,"hoehn_yahr":2.5,"ndufa4l2":-0.5,"ndufs2":-0.4,"pink1":-0.6,"ppargc1a":-0.4,"nlrp3":1.2,"il1b":1.0,"s100a8":0.9,"cxcl8":1.0,"target":1},
+    {"patient_id":"P-3009","age":57,"updrs_iii":22,"moca":26,"scopa_aut":17,"hoehn_yahr":1.5,"ndufa4l2":-0.1,"ndufs2":-0.1,"pink1":-0.2,"ppargc1a":-0.1,"nlrp3":0.5,"il1b":0.4,"s100a8":0.3,"cxcl8":0.4,"target":0},
+    {"patient_id":"P-3010","age":72,"updrs_iii":46,"moca":17,"scopa_aut":31,"hoehn_yahr":3.0,"ndufa4l2":-0.8,"ndufs2":-0.7,"pink1":-0.9,"ppargc1a":-0.7,"nlrp3":1.9,"il1b":1.7,"s100a8":1.5,"cxcl8":1.8,"target":1},
+    {"patient_id":"P-3010","age":72,"updrs_iii":46,"moca":17,"scopa_aut":31,"hoehn_yahr":3.0,"ndufa4l2":-0.8,"ndufs2":-0.7,"pink1":-0.9,"ppargc1a":-0.7,"nlrp3":1.9,"il1b":1.7,"s100a8":1.5,"cxcl8":1.8,"target":1},
+    {"patient_id":"P-3011","age":66,"updrs_iii":34,"moca":22,"scopa_aut":24,"hoehn_yahr":2.0,"ndufa4l2":-0.4,"ndufs2":-0.3,"pink1":-0.5,"ppargc1a":-0.3,"nlrp3":1.0,"il1b":0.9,"s100a8":0.8,"cxcl8":0.9,"target":1}
+  ]
+}

@@ -4,6 +4,17 @@
 #include <cjson/cJSON.h>
 
 #include "predict.h"
+#include "model.h"
+
+int predictor_init_model(const char *model_path) {
+    const char *path = model_path ? model_path : PARKINOME_MODEL_FILE;
+    if (model_load_active(path) == 0) {
+        fprintf(stderr, "[predictor] loaded model: %s\n", path);
+        return 0;
+    }
+    fprintf(stderr, "[predictor] model file not found, using built-in defaults\n");
+    return 1;
+}
 
 static const char *risk_category_str(int category) {
     return (category == 0) ? "LOW" :

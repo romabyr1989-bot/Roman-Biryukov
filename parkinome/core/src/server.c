@@ -9,6 +9,7 @@
 #include "predictor.h"
 #include "json_io.h"   // Чтение файлов для отдачи HTML
 #include "db.h"
+#include "train.h"
 
 #define PORT 8080
 #define BUFFER_SIZE 8192
@@ -232,6 +233,15 @@ void handle_save(int client, char *body) {
     send_response(client, "200 OK", "application/json", "{ \"status\": \"saved\" }");
 }
 
+void handle_train(int client, char *body) {
+    char result[1024];
+    if (run_training(body, result, sizeof(result)) != 0) {
+        send_response(client, "400 Bad Request", "application/json", "{ \"error\": \"training_failed\" }");
+        return;
+    }
+    send_response(client, "200 OK", "application/json", result);
+}
+
 /* ===== ОСНОВНОЙ ЦИКЛ СЕРВЕРА ===== */
 int main() {
 
@@ -242,6 +252,7 @@ int main() {
     if (db_init() != 0) {
         fprintf(stderr, "Ошибка инициализации БД\n");
     }
+    predictor_init_model(NULL);
 
     server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (server_fd < 0) {
@@ -341,6 +352,11 @@ int main() {
         /* ===== МАРШРУТ /save ===== */
         else if (!strcmp(method, "POST") && !strcmp(path, "/save")) {
             handle_save(client_socket, body);
+        }
+
+        /* ===== МАРШРУТ /train ===== */
+        else if (!strcmp(method, "POST") && !strcmp(path, "/train")) {
+            handle_train(client_socket, body);
         }
 
         /* ===== МАРШРУТ /history ===== */
