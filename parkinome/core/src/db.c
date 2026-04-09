@@ -598,10 +598,13 @@ char* db_get_predictions_json(int limit) {
             add_number_or_null(row, "moca", in_item);
             add_number_or_null(row, "scopa_aut", in_item);
             add_number_or_null(row, "hoehn_yahr", in_item);
+            add_number_or_null(row, "ndufa5", in_item);
             add_number_or_null(row, "ndufa4l2", in_item);
             add_number_or_null(row, "ndufs2", in_item);
             add_number_or_null(row, "pink1", in_item);
             add_number_or_null(row, "ppargc1a", in_item);
+            add_number_or_null(row, "cox7a2", in_item);
+            add_number_or_null(row, "tlr4", in_item);
             add_number_or_null(row, "nlrp3", in_item);
             add_number_or_null(row, "il1b", in_item);
             add_number_or_null(row, "s100a8", in_item);

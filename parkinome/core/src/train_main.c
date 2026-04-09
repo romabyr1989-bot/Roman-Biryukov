@@ -5,6 +5,10 @@
 #include "train.h"
 #include "model.h"
 
+#ifndef PARKINOME_MODEL_FILE
+#define PARKINOME_MODEL_FILE "model.dat"
+#endif
+
 int main(int argc, char **argv) {
     const char *dataset_path = "data/train_example.json";
     char *json = NULL;

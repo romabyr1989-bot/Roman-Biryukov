@@ -4,8 +4,11 @@
 #include <math.h>
 #include <cjson/cJSON.h>
 
-#include "predict.h"
 #include "model.h"
+
+#ifndef PARKINOME_MODEL_FILE
+#define PARKINOME_MODEL_FILE "model.dat"
+#endif
 
 int predictor_init_model(const char *model_path) {
     const char *path = model_path ? model_path : PARKINOME_MODEL_FILE;
@@ -61,19 +64,21 @@ static void build_interpretation(const parkinome_output_t *out, char *buf, size_
 }
 
 /* ===== ПАРСЕР ===== */
-static int parse_patient(cJSON *json, parkinome_input_t *in) {
+static int parse_patient(cJSON *json, parkinome_input_t *in, char *patient_id, size_t patient_id_size, int *has_patient_id) {
 
     if (!json || !in) return PARKINOME_NULL_POINTER;
 
     memset(in, 0, sizeof(*in));
+    if (patient_id && patient_id_size > 0) patient_id[0] = '\0';
+    if (has_patient_id) *has_patient_id = 0;
 
     cJSON *pid = cJSON_GetObjectItem(json, "patient_id");
     if (pid && cJSON_IsString(pid) && pid->valuestring) {
-        snprintf(in->patient_id, sizeof(in->patient_id), "%s", pid->valuestring);
-        in->has_patient_id = 1;
+        if (patient_id && patient_id_size > 0) snprintf(patient_id, patient_id_size, "%s", pid->valuestring);
+        if (has_patient_id) *has_patient_id = 1;
     } else if (pid && cJSON_IsNumber(pid)) {
-        snprintf(in->patient_id, sizeof(in->patient_id), "%.0f", pid->valuedouble);
-        in->has_patient_id = 1;
+        if (patient_id && patient_id_size > 0) snprintf(patient_id, patient_id_size, "%.0f", pid->valuedouble);
+        if (has_patient_id) *has_patient_id = 1;
     }
 
     /* Копируем только поля, которые есть в JSON, и выставляем флаги has_* для модели. */
@@ -91,15 +96,26 @@ static int parse_patient(cJSON *json, parkinome_input_t *in) {
     SET_FIELD(scopa_aut);
     SET_FIELD(hoehn_yahr);
 
-    SET_FIELD(ndufa4l2);
+    SET_FIELD(ndufa5);
     SET_FIELD(ndufs2);
     SET_FIELD(pink1);
     SET_FIELD(ppargc1a);
+    SET_FIELD(cox7a2);
+    SET_FIELD(tlr4);
     SET_FIELD(nlrp3);
     SET_FIELD(il1b);
     SET_FIELD(s100a8);
     SET_FIELD(cxcl8);
     #undef SET_FIELD
+
+    /* Обратная совместимость со старыми payload. */
+    if (!in->has_ndufa5) {
+        cJSON *legacy = cJSON_GetObjectItem(json, "ndufa4l2");
+        if (legacy && cJSON_IsNumber(legacy)) {
+            in->ndufa5 = legacy->valuedouble;
+            in->has_ndufa5 = 1;
+        }
+    }
 
     return PARKINOME_OK;
 }
@@ -114,9 +130,11 @@ static int append_prediction(cJSON *patient, cJSON *patients_out) {
     cJSON *indices = NULL;
     cJSON *levels = NULL;
     cJSON *genes = NULL;
+    char patient_id[64] = {0};
+    int has_patient_id = 0;
     char interpretation[320] = {0};
 
-    if (parse_patient(patient, &in) != 0) {
+    if (parse_patient(patient, &in, patient_id, sizeof(patient_id), &has_patient_id) != 0) {
         return 1;
     }
 
@@ -129,21 +147,21 @@ static int append_prediction(cJSON *patient, cJSON *patients_out) {
     row = cJSON_CreateObject();
     if (!row) return 1;
 
-    if (in.has_patient_id) {
-        cJSON_AddStringToObject(row, "patient_id", in.patient_id);
+    if (has_patient_id) {
+        cJSON_AddStringToObject(row, "patient_id", patient_id);
     }
     cJSON_AddNumberToObject(row, "isp", out.isp);
     cJSON_AddNumberToObject(row, "risk_probability", out.risk_probability);
     cJSON_AddStringToObject(row, "category", cat);
     cJSON_AddNumberToObject(row, "confidence", out.confidence);
-    /* Новые биологические индексы для downstream-аналитики/UI. */
+    /* Новые биологические индексы для аналитики и UI. */
     cJSON_AddNumberToObject(row, "mito_score", out.mito_score);
     cJSON_AddNumberToObject(row, "inflam_score", out.inflam_score);
     cJSON_AddNumberToObject(row, "imbalance", out.imbalance);
     build_interpretation(&out, interpretation, sizeof(interpretation));
     cJSON_AddStringToObject(row, "interpretation", interpretation);
 
-    /* UI-friendly structured blocks for interpretability. */
+    /* Структурированные блоки для UI и интерпретации результата. */
     breakdown = cJSON_CreateObject();
     explainability = cJSON_CreateObject();
     indices = cJSON_CreateObject();
@@ -179,10 +197,12 @@ static int append_prediction(cJSON *patient, cJSON *patients_out) {
     cJSON_AddStringToObject(levels, "inflammation", level_str(out.inflam_level));
     cJSON_AddItemToObject(row, "levels", levels);
 
-    if (in.has_ndufa4l2) cJSON_AddNumberToObject(genes, "ndufa4l2", in.ndufa4l2);
+    if (in.has_ndufa5) cJSON_AddNumberToObject(genes, "ndufa5", in.ndufa5);
     if (in.has_ndufs2) cJSON_AddNumberToObject(genes, "ndufs2", in.ndufs2);
     if (in.has_pink1) cJSON_AddNumberToObject(genes, "pink1", in.pink1);
     if (in.has_ppargc1a) cJSON_AddNumberToObject(genes, "ppargc1a", in.ppargc1a);
+    if (in.has_cox7a2) cJSON_AddNumberToObject(genes, "cox7a2", in.cox7a2);
+    if (in.has_tlr4) cJSON_AddNumberToObject(genes, "tlr4", in.tlr4);
     if (in.has_nlrp3) cJSON_AddNumberToObject(genes, "nlrp3", in.nlrp3);
     if (in.has_il1b) cJSON_AddNumberToObject(genes, "il1b", in.il1b);
     if (in.has_s100a8) cJSON_AddNumberToObject(genes, "s100a8", in.s100a8);

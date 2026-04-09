@@ -11,6 +11,10 @@
 #include "model.h"
 #include "json_io.h"
 
+#ifndef PARKINOME_MODEL_FILE
+#define PARKINOME_MODEL_FILE "model.dat"
+#endif
+
 #define TRAIN_DEFAULT_LR 0.01
 #define TRAIN_DEFAULT_EPOCHS 1200
 #define TRAIN_DEFAULT_L2 0.001
@@ -36,8 +40,8 @@ typedef struct {
 
 static const char *k_feature_names[PARKINOME_FEATURE_COUNT] = {
     "age", "updrs_iii", "moca", "scopa_aut", "hoehn_yahr",
-    "ndufa4l2", "ndufs2", "pink1", "ppargc1a",
-    "nlrp3", "il1b", "s100a8", "cxcl8"
+    "ndufa5", "ndufs2", "pink1", "ppargc1a", "cox7a2",
+    "tlr4", "nlrp3", "il1b", "s100a8", "cxcl8"
 };
 
 static char* trim_copy(const char *s) {
@@ -121,6 +125,7 @@ static void extract_features_from_json(cJSON *obj, double x[PARKINOME_FEATURE_CO
     int i;
     for (i = 0; i < PARKINOME_FEATURE_COUNT; i++) {
         cJSON *v = cJSON_GetObjectItem(obj, k_feature_names[i]);
+        if (!v && i == 5) v = cJSON_GetObjectItem(obj, "ndufa4l2"); /* старый алиас */
         x[i] = (v && cJSON_IsNumber(v)) ? v->valuedouble : 0.0;
     }
 }
@@ -297,7 +302,7 @@ static confusion_t evaluate(const sample_t *samples, const int *idx, int n, cons
 
     for (i = 0; i < n; i++) {
         const sample_t *s = &samples[idx[i]];
-        double p = model_predict_probability_from_features(model, s->x);
+        double p = model_predict_probability(model, s->x);
         int pred = (p >= 0.5) ? 1 : 0;
         if (pred == 1 && s->y == 1) c.tp++;
         else if (pred == 1 && s->y == 0) c.fp++;
@@ -365,7 +370,7 @@ static void compute_roc_from_test(
 
     for (i = 0; i < n; i++) {
         const sample_t *s = &samples[idx[i]];
-        scored[i].prob = model_predict_probability_from_features(model, s->x);
+        scored[i].prob = model_predict_probability(model, s->x);
         scored[i].y = s->y;
         if (s->y == 1) positives++;
         else negatives++;
@@ -441,6 +446,7 @@ int train_and_save_model_from_json(const char *json_text, const train_config_t *
     int *idx = NULL;
     int train_n;
     logistic_model_t model;
+    neurostrata_model_t trained_bundle;
     confusion_t cm;
 
     if (!json_text || !result) return 1;
@@ -484,13 +490,17 @@ int train_and_save_model_from_json(const char *json_text, const train_config_t *
     result->intercept = model.intercept;
     compute_roc_from_test(samples, idx + train_n, n - train_n, &model, result);
 
-    if (model_save(model_path ? model_path : PARKINOME_MODEL_FILE, &model) != 0) {
+    trained_bundle = *model_get_active();
+    trained_bundle.logistic = model;
+    trained_bundle.version = 2;
+
+    if (model_save(model_path ? model_path : PARKINOME_MODEL_FILE, &trained_bundle) != 0) {
         free(idx);
         free_samples(samples, n);
         return 1;
     }
 
-    model_set_active(&model);
+    model_set_active(&trained_bundle);
 
     free(idx);
     free_samples(samples, n);
